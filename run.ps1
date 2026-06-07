@@ -18,6 +18,6 @@ if (-not $nodePath) {
     exit 1
 }
 
-Write-Host "SideClip is running at http://localhost:4173" -ForegroundColor Green
-Start-Process "http://localhost:4173"
+Write-Host "SideClip is running at http://127.0.0.1:4173" -ForegroundColor Green
+Start-Process "http://127.0.0.1:4173"
 & $nodePath server.js
