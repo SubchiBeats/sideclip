@@ -145,6 +145,14 @@ async function saveDb() {
 }
 
 const vagueHookPattern = /^(try this|do this|stop scrolling|you need this|this changes everything|wait for it|the secret|one simple trick|before you add another task)/i;
+function promisedCount(hook) {
+  const match = String(hook || "").match(/^(\d+)\s|^(three|four|five)\s/i);
+  return match ? Number(match[1] || { three: 3, four: 4, five: 5 }[match[2].toLowerCase()]) : 0;
+}
+function captionFulfillsPromise(idea) {
+  const count = promisedCount(idea.hook);
+  return !count || Array.from({ length: count }, (_, index) => String(idea.caption || "").includes(`${index + 1}.`)).every(Boolean);
+}
 
 function ideaQuality(idea, input = {}) {
   const hook = clean(idea.hook, 500);
@@ -222,6 +230,39 @@ function localIdeas(input) {
   }])[1];
   const { topic, pain, outcome, action, proof, asset, risk } = profile;
   const topicArticle = /^[aeiou]/i.test(topic) ? "an" : "a";
+  const captionDetails = [
+    `The shift is simple: make ${topic} part of the process instead of a final-minute rescue. Start small, repeat what works, and document the result.`,
+    `Three signs to watch:\n1. ${risk} appear late.\n2. Nobody clearly owns the next step.\n3. The team cannot show what was checked or fixed.`,
+    `A stronger workflow does more than find a problem. It gives the team ${proof}, so everyone knows what to do next.`,
+    `The real cost of a late problem is not only the fix. It is the rushed decisions, repeated approvals, and lost confidence around it.`,
+    `Use this three-step method:\n1. Run one consistent check.\n2. Prioritize the highest-impact result.\n3. Record the fix and owner.`,
+    `The goal is not more process. It is ${outcome} without forcing the team into another complicated system.`,
+    `Moving ${topic} earlier gives people time to make thoughtful fixes instead of choosing whatever is fastest under pressure.`,
+    `Before finishing, check three things:\n1. Is the intended outcome clear?\n2. Is the evidence recorded?\n3. Are human-review decisions visible?`,
+    `${product} is designed around the final handoff: clear findings, practical next steps, and a record the team can actually use.`,
+    `Imagine replacing ${pain} with a repeatable routine. The biggest benefit is not speed alone; it is knowing what happens next.`,
+    `One-file checks can miss project-wide patterns. Review the complete workflow to find repeat issues, inconsistent decisions, and ownership gaps.`,
+    `Bring the work into one ${asset}. That makes priorities easier to compare, progress easier to track, and open questions harder to lose.`,
+    `When someone asks, “How do you know it is ready?” the answer should be more than confidence. Show the method, result, and remaining risks.`,
+    `Checking finds issues. Proving records what happened. Strong ${topic} includes the method, result, open questions, and next-step owner.`,
+    `Repeatability turns ${topic} from a stressful event into an advantage the team can improve with every project.`,
+    `Early feedback protects options. Once approvals, formatting, or delivery are locked, even a small fix can create an expensive revision cycle.`,
+    `Automation is best for repeatable checks. Human judgment is still essential for context, quality, and the decisions that affect real people.`,
+    `${product} focuses on the next step, not just the finding. Clear guidance helps the team move from problem to finished work faster.`,
+    `A shared ${asset} replaces scattered notes and disconnected tools with visible priorities, owners, and open questions.`,
+    `Actionable feedback answers four things: What is wrong? Why does it matter? What should change? Who owns the next step?`,
+    `Fewer surprises come from making ${topic} visible before it becomes urgent. That is how teams protect both quality and deadlines.`,
+    `A strong handoff is short because the hard questions were answered earlier. ${proof} makes the final decision easier to approve.`,
+    `Move ${topic} upstream. Earlier improvements are usually faster to make, easier to verify, and less expensive to revisit.`,
+    `A real preflight replaces “I think it is ready” with a repeatable check, practical fixes, and a clear path to ${outcome}.`,
+    `Look across the whole project for patterns. Fixing a recurring cause once is more valuable than repairing the same symptom in every file.`,
+    `Four questions to answer:\n1. What happened?\n2. What changed?\n3. What remains?\n4. Who owns the next step?`,
+    `Prioritization keeps the team from drowning in noise. Focus first on work that meaningfully improves the outcome or reduces risk.`,
+    `A structured ${topic} gives every stakeholder the same facts, the same open questions, and the same definition of done.`,
+    `Build a quality gate with four parts: defined checks, a clear threshold, recorded evidence, and visible human review.`,
+    `Knowing before you ship changes the conversation. The team can act with context, show its work, and deliver with confidence.`
+  ];
+  const visualStyles = ["orbit", "checklist", "spotlight", "cards", "grid", "waves"];
   const ideas = [
     ["Story", `POV: ${audience} finally make ${topic} feel manageable`, `A consistent ${topic} turns stressful last-minute work into ${outcome}.`, "See the better workflow"],
     ["Educate", `3 warning signs ${risk} are slowing you down`, `Catch the pattern early, prioritize the highest-impact fix, and protect the final result.`, "Save this quick checklist"],
@@ -265,14 +306,15 @@ function localIdeas(input) {
     if (draftIssues.some(issue => issue.startsWith("Supporting line needs"))) {
       relevantBody = `For ${topic}, ${body.charAt(0).toLowerCase()}${body.slice(1)}`;
     }
-    const item = { day: index + 1, format, hook: cleanWords(relevantHook, 105), body: cleanWords(relevantBody, 145), cta: cleanWords(cta, 34) };
+    const caption = `${cleanWords(relevantHook, 105)}\n\n${captionDetails[index]}\n\n${cleanWords(relevantBody, 145)}\n\n${cleanWords(cta, 34)}.\n\n#${product.replace(/[^a-z0-9]/gi, "")} #${topic.replace(/[^a-z0-9]/gi, "")} #BetterWorkflows`;
+    const item = { day: index + 1, format, hook: cleanWords(relevantHook, 105), body: cleanWords(relevantBody, 145), cta: cleanWords(cta, 34), caption, visual: visualStyles[index % visualStyles.length] };
     return { ...item, quality: ideaQuality(item, input).score };
   });
 }
 
 async function ollamaIdeas(input) {
   if (!OLLAMA_MODEL) return null;
-  const prompt = `Create exactly 30 distinct short-form video ideas as a JSON array. Each object needs day, format (Story, Educate, or Promote), hook, body, and cta. Every body must be unique, directly continue its hook, include naturally relevant search keywords, deliver one useful insight, and stay under 145 characters. Every CTA must be unique, specific to the idea, and under 34 characters. Never repeat a generic product-description sentence. Product: ${clean(input.product, 80)}. Audience: ${clean(input.audience, 120)}. Description: ${clean(input.description, 240)}. Goal: ${clean(input.goal, 80)}. Return JSON only.`;
+  const prompt = `Create exactly 30 distinct short-form video ideas as a JSON array. Each object needs day, format (Story, Educate, or Promote), hook, body, cta, and caption. Every body must be unique, directly continue its hook, include naturally relevant search keywords, deliver one useful insight, and stay under 145 characters. Every CTA must be unique, specific to the idea, and under 34 characters. Every caption must fully deliver on the hook; if a hook promises a numbered list, the caption must contain that exact number of useful items. Never repeat a generic product-description sentence. Product: ${clean(input.product, 80)}. Audience: ${clean(input.audience, 120)}. Description: ${clean(input.description, 240)}. Goal: ${clean(input.goal, 80)}. Return JSON only.`;
   const response = await fetch(`${OLLAMA_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -286,7 +328,7 @@ async function ollamaIdeas(input) {
   if (!Array.isArray(ideas)) return null;
   const generated = ideas.slice(0, 30).map((idea, index) => ({
     day: index + 1, format: ["Story", "Educate", "Promote"].includes(idea.format) ? idea.format : "Story",
-    hook: clean(idea.hook, 105), body: clean(idea.body, 145), cta: clean(idea.cta, 34)
+    hook: clean(idea.hook, 105), body: clean(idea.body, 145), cta: clean(idea.cta, 34), caption: clean(idea.caption, 1600)
   }));
   const fallback = localIdeas(input);
   const usedHooks = new Set();
@@ -294,12 +336,12 @@ async function ollamaIdeas(input) {
   const usedCtas = new Set();
   return fallback.map((backup, index) => {
     const candidate = generated[index];
-    const valid = candidate && candidate.hook && candidate.body && candidate.cta &&
+    const valid = candidate && candidate.hook && candidate.body && candidate.cta && candidate.caption && captionFulfillsPromise(candidate) &&
       ideaQuality(candidate, input).score >= 75 &&
       !usedHooks.has(candidate.hook) && !usedBodies.has(candidate.body) && !usedCtas.has(candidate.cta);
     const idea = valid ? candidate : backup;
     usedHooks.add(idea.hook); usedBodies.add(idea.body); usedCtas.add(idea.cta);
-    return { ...idea, day: index + 1, quality: ideaQuality(idea, input).score };
+    return { ...backup, ...idea, day: index + 1, quality: ideaQuality(idea, input).score };
   });
 }
 

@@ -16,6 +16,8 @@ test("offline generator returns thirty structured ideas", () => {
   assert.equal(new Set(ideas.map(idea => idea.hook)).size, 30);
   assert.equal(new Set(ideas.map(idea => idea.body)).size, 30);
   assert.equal(new Set(ideas.map(idea => idea.cta)).size, 30);
+  assert.equal(new Set(ideas.map(idea => idea.caption)).size, 30);
+  assert.equal(new Set(ideas.map(idea => idea.visual)).size, 6);
   assert.ok(ideas.every(idea => idea.body.length <= 145));
   assert.ok(ideas.every(idea => idea.cta.length <= 34));
   assert.ok(ideas.every(idea => ideaQuality(idea, { product: "SideClip", description: "ship video faster" }).score === 100));
@@ -32,6 +34,12 @@ test("offline supporting copy stays concise for long campaign briefs", () => {
   assert.ok(ideas.every(idea => !idea.body.endsWith(" scan")));
   assert.match(ideas.map(idea => idea.body).join(" "), /preflight|review|delivery|evidence/i);
   assert.match(ideas[0].body, /accessibility preflight/i);
+  const numbered = ideas.find(idea => idea.hook.startsWith("3 warning signs"));
+  assert.match(numbered.caption, /1\./);
+  assert.match(numbered.caption, /2\./);
+  assert.match(numbered.caption, /3\./);
+  const fourQuestions = ideas.find(idea => idea.hook.startsWith("Four questions"));
+  assert.match(fourQuestions.caption, /4\./);
   assert.ok(ideas.every(idea => ideaQuality(idea, {
     product: "AccessReady",
     description: "Scan mixed-format communications deliverables for common Section 508 and WCAG accessibility risks, explain fixes in plain English, organize remediation, and generate client-ready evidence packs before content is published or delivered."

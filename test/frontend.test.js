@@ -29,6 +29,8 @@ test("video renderer fits supporting copy and centers CTA text", () => {
   assert.doesNotMatch(app, /visible\[maxLines - 1\].*…/);
   assert.match(app, /Publish readiness/);
   assert.match(app, /planNeedsUpgrade/);
+  assert.match(app, /ctx\.rect\(18, 195, 324, 220\)/);
+  assert.match(app, /ctx\.rect\(30, 464, 300, 72\)/);
 });
 
 test("theme toggle is persistent and hero copy uses readable panels", () => {
@@ -37,4 +39,11 @@ test("theme toggle is persistent and hero copy uses readable panels", () => {
   assert.match(theme, /sideclip-theme/);
   assert.match(theme, /prefers-color-scheme: dark/);
   assert.match(fs.readFileSync(path.join(root, "styles.css"), "utf8"), /\[data-theme="dark"\]/);
+});
+
+test("editor supports varied visuals and complete post captions", () => {
+  assert.match(html, /id="visualStyle"/);
+  assert.match(html, /id="editCaption"/);
+  for (const style of ["orbit", "checklist", "spotlight", "cards", "grid", "waves"]) assert.match(app, new RegExp(style));
+  assert.match(app, /state\.current\.caption/);
 });

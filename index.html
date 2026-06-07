@@ -224,8 +224,10 @@
                 <label class="field copy-field"><span>Hook <small id="hookCount">0 / 105</small></span><textarea id="editHook" maxlength="105"></textarea></label>
                 <label class="field copy-field"><span>Supporting line <small id="bodyCount">0 / 145</small></span><textarea id="editBody" maxlength="145"></textarea></label>
                 <label class="field copy-field"><span>Call to action <small id="ctaCount">0 / 34</small></span><input id="editCta" maxlength="34" value="See how it works"></label>
+                <label class="field copy-field caption-field"><span>Post caption <small id="captionCount">0 / 1600</small></span><textarea id="editCaption" maxlength="1600" placeholder="A complete caption to publish with the video"></textarea></label>
                 <label class="field"><span>Accent color</span><input id="editColor" type="color" value="#d7ff39"></label>
                 <div class="quality-panel" id="qualityPanel"><b id="qualityScore">Publish readiness: 100</b><p id="qualityIssues">Relevant, concise, and ready to render.</p></div>
+                <label class="field"><span>Visual style</span><select id="visualStyle"><option value="orbit">Orbit</option><option value="checklist">Checklist</option><option value="spotlight">Spotlight</option><option value="cards">Floating cards</option><option value="grid">Signal grid</option><option value="waves">Flowing waves</option></select></label>
                 <label class="field"><span>Background media</span><select id="editAsset"><option value="">Procedural animation</option></select></label>
                 <label class="field"><span>Exported voiceover</span><select id="voiceAsset"><option value="">No audio track</option></select></label>
                 <label class="field"><span>Narration voice</span><select id="voiceSelect"><option value="">System default</option></select></label>
@@ -235,7 +237,7 @@
                 </div>
                 <div class="tool-row">
                   <button class="ghost-button" id="subtitleButton" type="button">Download captions</button>
-                  <button class="ghost-button" id="shareButton" type="button">Share / posting pack</button>
+                  <button class="ghost-button" id="shareButton" type="button">Share / copy post caption</button>
                 </div>
                 <div class="render-info"><span>●</span><p><b>Browser rendering</b><br>Your video stays on this device.</p></div>
                 <button class="button button-lime" id="renderButton" type="submit">Render & download video <span>↓</span></button>

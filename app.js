@@ -12,6 +12,8 @@ const state = {
     hook: "Your to-do list isn't the problem.",
     body: "The way you plan your attention is.",
     cta: "Try FocusFlow today →",
+    caption: "Your best work deserves a workflow that protects your attention.",
+    visual: "orbit",
     color: "#d7ff39"
   },
   previewFrame: 0,
@@ -84,6 +86,7 @@ function copyQuality(idea) {
   const hook = String(idea.hook || "").trim();
   const body = String(idea.body || "").trim();
   const cta = String(idea.cta || "").trim();
+  const caption = String(idea.caption || "").trim();
   const descriptionWords = $("#description").value.toLowerCase().match(/[a-z0-9]{5,}/g) || [];
   const product = $("#product").value.toLowerCase();
   const relevant = product && `${hook} ${body}`.toLowerCase().includes(product) ||
@@ -94,13 +97,19 @@ function copyQuality(idea) {
   if (hook.length < 18 || hook.length > 105) issues.push("Keep the hook between 18 and 105 characters.");
   if (body.length < 45 || body.length > 145) issues.push("Keep the supporting line between 45 and 145 characters.");
   if (cta.length < 8 || cta.length > 34) issues.push("Keep the call to action between 8 and 34 characters.");
+  if (caption.length < 100) issues.push("Add a useful post caption that expands on the video.");
+  const promiseMatch = hook.match(/^(\d+)\s|^(three|four|five)\s/i);
+  const promisedCount = promiseMatch ? Number(promiseMatch[1] || { three: 3, four: 4, five: 5 }[promiseMatch[2].toLowerCase()]) : 0;
+  if (promisedCount && !Array.from({ length: promisedCount }, (_, index) => caption.includes(`${index + 1}.`)).every(Boolean)) {
+    issues.push(`The caption must deliver all ${promisedCount} promised items.`);
+  }
   return { score: Math.max(0, 100 - issues.length * 25), issues };
 }
 
 function planNeedsUpgrade(plan) {
   if (!Array.isArray(plan) || plan.length !== 30) return true;
   if (new Set(plan.map(idea => idea.body)).size !== plan.length) return true;
-  return plan.some(idea => copyQuality(idea).score < 75);
+  return plan.some(idea => !idea.caption || !idea.visual || copyQuality(idea).score < 100);
 }
 
 function showView(name) {
@@ -165,10 +174,12 @@ async function generatePlan() {
       const hook = fill(templates[format][Math.floor(index / formats.length) % templates[format].length], values);
       const cycle = Math.floor(index / support.length);
       const context = cycle === 1 ? ` Built for ${values.audience.split(",")[0]}.` : cycle === 2 ? ` Make it part of your next ${values.product} campaign.` : "";
+      const caption = `${hook}\n\n${support[index % support.length]}\n\n${actions[(index + cycle) % actions.length]}.\n\n#${values.product.replace(/[^a-z0-9]/gi, "")} #ShortFormVideo`;
       return {
         day: index + 1, format, hook,
         body: `${support[index % support.length]}${context}`,
-        cta: actions[(index + cycle) % actions.length]
+        cta: actions[(index + cycle) % actions.length], caption,
+        visual: ["orbit", "checklist", "spotlight", "cards", "grid", "waves"][index % 6]
       };
     });
     toast("Using the built-in offline generator.");
@@ -208,25 +219,29 @@ $("#newBrief").addEventListener("click", () => showView("brief"));
 $("#backToPlan").addEventListener("click", () => showView("calendar"));
 
 function openEditor(item) {
-  state.current = {...item, color: item.format === "Story" ? "#ff725c" : item.format === "Educate" ? "#7095ff" : "#d7ff39"};
+  state.current = {...item, caption: item.caption || `${item.hook}\n\n${item.body}\n\n${item.cta}.`, visual: item.visual || "orbit", color: item.color || (item.format === "Story" ? "#ff725c" : item.format === "Educate" ? "#7095ff" : "#d7ff39")};
   $("#editFormat").value = state.current.format;
   $("#editHook").value = state.current.hook;
   $("#editBody").value = state.current.body;
   $("#editCta").value = state.current.cta;
+  $("#editCaption").value = state.current.caption;
   $("#editColor").value = state.current.color;
+  $("#visualStyle").value = state.current.visual;
   updateQualityUi();
   updatePreview();
   showView("editor");
 }
 
-["editFormat", "editHook", "editBody", "editCta", "editColor"].forEach(id => {
+["editFormat", "editHook", "editBody", "editCta", "editCaption", "editColor", "visualStyle"].forEach(id => {
   $(`#${id}`).addEventListener("input", () => {
     state.current = {
       format: $("#editFormat").value,
       hook: $("#editHook").value,
       body: $("#editBody").value,
       cta: $("#editCta").value,
-      color: $("#editColor").value
+      caption: $("#editCaption").value,
+      color: $("#editColor").value,
+      visual: $("#visualStyle").value
     };
     updateQualityUi();
     updatePreview();
@@ -238,6 +253,7 @@ function updateQualityUi() {
   $("#hookCount").textContent = `${state.current.hook.length} / 105`;
   $("#bodyCount").textContent = `${state.current.body.length} / 145`;
   $("#ctaCount").textContent = `${state.current.cta.length} / 34`;
+  $("#captionCount").textContent = `${state.current.caption.length} / 1600`;
   $("#qualityScore").textContent = `Publish readiness: ${quality.score}`;
   $("#qualityIssues").textContent = quality.issues.length ? quality.issues.join(" ") : "Specific, relevant, concise, and ready to render.";
   $("#qualityPanel").classList.toggle("warning", quality.issues.length > 0);
@@ -312,13 +328,83 @@ function fitSingleLine(context, text, maxWidth, startSize, minSize, weight = 800
   return size;
 }
 
+function drawProcedural(context, style, progress, color) {
+  const p = progress * Math.PI * 2;
+  const glow = context.createRadialGradient(180, 245, 10, 180, 245, 300);
+  glow.addColorStop(0, color + "b8");
+  glow.addColorStop(1, "#11110f00");
+  context.fillStyle = glow;
+  context.fillRect(0, 0, 360, 430);
+  context.save();
+  context.strokeStyle = color + "70";
+  context.fillStyle = color + "30";
+
+  if (style === "checklist") {
+    [120, 190, 260, 330].forEach((y, index) => {
+      const offset = Math.sin(p + index) * 7;
+      context.fillStyle = "#ffffff10";
+      context.beginPath(); context.roundRect(45 + offset, y, 270, 48, 12); context.fill();
+      context.fillStyle = color;
+      context.beginPath(); context.arc(68 + offset, y + 24, 10, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "#11110f"; context.lineWidth = 3;
+      context.beginPath(); context.moveTo(63 + offset, y + 24); context.lineTo(67 + offset, y + 28); context.lineTo(74 + offset, y + 19); context.stroke();
+      context.fillStyle = "#ffffff35"; context.fillRect(91 + offset, y + 17, 155 - index * 15, 5); context.fillRect(91 + offset, y + 29, 105 + index * 12, 4);
+    });
+  } else if (style === "spotlight") {
+    [0, 1, 2].forEach(index => {
+      const x = 90 + index * 90 + Math.sin(p + index * 2) * 25;
+      const y = 210 + Math.cos(p + index) * 45;
+      const radial = context.createRadialGradient(x, y, 5, x, y, 75);
+      radial.addColorStop(0, color + "aa"); radial.addColorStop(1, color + "00");
+      context.fillStyle = radial; context.fillRect(x - 80, y - 80, 160, 160);
+    });
+  } else if (style === "cards") {
+    [-1, 0, 1].forEach((index, position) => {
+      context.save();
+      context.translate(180 + index * 82, 225 + Math.sin(p + position) * 12);
+      context.rotate(index * .12 + Math.sin(p) * .025);
+      context.fillStyle = position === 1 ? color + "aa" : "#ffffff16";
+      context.beginPath(); context.roundRect(-52, -78, 104, 156, 15); context.fill();
+      context.strokeStyle = "#ffffff30"; context.stroke();
+      context.restore();
+    });
+  } else if (style === "grid") {
+    context.lineWidth = 1;
+    for (let x = 20; x < 360; x += 42) { context.beginPath(); context.moveTo(x, 75); context.lineTo(x, 410); context.stroke(); }
+    for (let y = 75; y < 420; y += 42) { context.beginPath(); context.moveTo(15, y); context.lineTo(345, y); context.stroke(); }
+    for (let index = 0; index < 7; index++) {
+      context.fillStyle = index % 2 ? color : "#ffffff";
+      context.beginPath(); context.arc(54 + index * 42, 117 + ((index * 3) % 6) * 42, 4 + Math.sin(p + index) * 2, 0, Math.PI * 2); context.fill();
+    }
+  } else if (style === "waves") {
+    context.lineWidth = 3;
+    for (let row = 0; row < 7; row++) {
+      context.beginPath();
+      for (let x = 0; x <= 360; x += 8) {
+        const y = 130 + row * 38 + Math.sin(x / 35 + p + row * .7) * 18;
+        x ? context.lineTo(x, y) : context.moveTo(x, y);
+      }
+      context.stroke();
+    }
+  } else {
+    context.translate(180, 240);
+    context.rotate(progress * .5);
+    context.lineWidth = 35;
+    context.beginPath();
+    context.arc(0, 0, 145 + Math.sin(progress * 4) * 8, 0, Math.PI * 1.65);
+    context.stroke();
+  }
+  context.restore();
+}
+
 function drawFrame(progress = 0) {
-  const { format, hook, body, cta, color } = state.current;
+  const { format, hook, body, cta, color, visual = "orbit" } = state.current;
   const quality = copyQuality(state.current);
   const bodyFits = !quality.issues.some(issue => issue.startsWith("Keep the supporting line"));
   const renderBody = bodyFits ? body : "Supporting line is too long. Shorten it to 145 characters before rendering.";
   ctx.fillStyle = "#11110f";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawProcedural(ctx, visual, progress, color);
   if (state.assetElement) {
     const media = state.assetElement;
     const sourceWidth = media.videoWidth || media.naturalWidth || 360;
@@ -332,20 +418,6 @@ function drawFrame(progress = 0) {
     ctx.fillStyle = "#11110f88";
     ctx.fillRect(0, 0, 360, 640);
   }
-  const glow = ctx.createRadialGradient(180, 255, 10, 180, 255, 300);
-  glow.addColorStop(0, color + "cc");
-  glow.addColorStop(1, "#11110f00");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, 360, 540);
-  ctx.save();
-  ctx.translate(180, 265);
-  ctx.rotate(progress * .5);
-  ctx.strokeStyle = color + "66";
-  ctx.lineWidth = 35;
-  ctx.beginPath();
-  ctx.arc(0, 0, 145 + Math.sin(progress * 4) * 8, 0, Math.PI * 1.65);
-  ctx.stroke();
-  ctx.restore();
   ctx.fillStyle = color;
   roundedRect(ctx, 24, 26, 82, 23, 12);
   ctx.fillStyle = "#11110f";
@@ -354,11 +426,16 @@ function drawFrame(progress = 0) {
   ctx.textBaseline = "alphabetic";
   ctx.fillText(format.toUpperCase(), 40, 41);
 
-  const hookBlock = fitTextBlock(ctx, hook, 310, 5, 36, 20, 800);
+  const hookBlock = fitTextBlock(ctx, hook, 310, 6, 34, 18, 800);
   const hookLineHeight = Math.round(hookBlock.size * 1.08);
   const hookHeight = hookBlock.lines.length * hookLineHeight;
-  const hookY = Math.max(250, 405 - hookHeight);
+  const hookY = Math.max(205, 410 - hookHeight);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(18, 195, 324, 220);
+  ctx.clip();
   drawTextBlock(ctx, hookBlock, 25, hookY, hookLineHeight, "#ffffff");
+  ctx.restore();
 
   ctx.globalAlpha = progress === 0 ? 1 : Math.min(1, .45 + progress * 1.8);
   ctx.fillStyle = "#11110fcc";
@@ -374,7 +451,12 @@ function drawFrame(progress = 0) {
   ctx.textBaseline = "top";
   ctx.fillText("WHY IT MATTERS", 32, 446);
   const bodyBlock = fitTextBlock(ctx, renderBody, 296, 6, 14, 9, 600);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(30, 464, 300, 72);
+  ctx.clip();
   drawTextBlock(ctx, bodyBlock, 32, 466, Math.round(bodyBlock.size * 1.28), bodyFits ? "#f2efe5" : "#ff927f");
+  ctx.restore();
   ctx.globalAlpha = 1;
 
   ctx.shadowColor = "#00000066";
@@ -739,13 +821,13 @@ $("#subtitleButton").addEventListener("click", () => {
   downloadBlob("sideclip-captions.srt", "text/plain", content);
 });
 $("#shareButton").addEventListener("click", async () => {
-  const text = `${state.current.hook}\n\n${state.current.body}\n\n${state.current.cta}`;
+  const text = state.current.caption;
   if (navigator.share) {
     try { await navigator.share({ title: $("#product").value, text }); return; } catch {}
   }
   await navigator.clipboard.writeText(text);
   downloadBlob("sideclip-posting-pack.txt", "text/plain", text);
-  toast("Caption copied and posting pack downloaded.");
+  toast("Full post caption copied and downloaded.");
 });
 $("#openMediaButton").addEventListener("click", () => showView("assets"));
 
