@@ -160,22 +160,38 @@ function ideaQuality(idea, input = {}) {
   const hook = clean(idea.hook, 500);
   const body = clean(idea.body, 500);
   const cta = clean(idea.cta, 500);
+  const caption = clean(idea.caption, 2000);
   const product = clean(input.product, 80).toLowerCase();
-  const descriptionWords = clean(input.description, 240).toLowerCase().match(/[a-z0-9]{5,}/g) || [];
+  const audience = clean(input.audience, 120).toLowerCase();
+  const stopWords = new Set(["about", "after", "again", "better", "helps", "people", "provides", "their", "there", "these", "those", "through", "using", "with"]);
+  const descriptionWords = (clean(input.description, 240).toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter(word => !stopWords.has(word));
   const hookRelevant = product && hook.toLowerCase().includes(product) ||
     descriptionWords.some(word => hook.toLowerCase().includes(word));
   const bodyRelevant = product && body.toLowerCase().includes(product) ||
     descriptionWords.some(word => body.toLowerCase().includes(word));
+  const specific = descriptionWords.some(word => `${hook} ${body}`.toLowerCase().includes(word));
+  const bodySpecific = descriptionWords.some(word => body.toLowerCase().includes(word));
   const hasAngle = /\d|pov|why|how|before|after|mistake|warning|what if|we |our |the day|the tiny thing|the small detail|the face|the daily|the moment|the sound|the household rule|the easiest|the best|a completely normal|a real result|ready for|what .+ says|review of today|could text|difference|stop|finally|fewer|without|vs|versus|meet|turn|get to|know|one |cannot|not just|from .+ to |\?/i.test(hook);
+  const genericCopy = /chosen with care|clear value, useful details|straightforward next step|next important decision|truly fits|people decide whether|when details matter|the small detail people remember|without enough useful detail/i;
+  const hookTerms = (hook.toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter(word => !stopWords.has(word) && word !== product);
+  const bodyContinuesHook = hookTerms.some(word => body.toLowerCase().includes(word)) || descriptionWords.some(word => body.toLowerCase().includes(word));
   const issues = [];
   if (vagueHookPattern.test(hook)) issues.push("Hook is too vague.");
+  if (genericCopy.test(`${hook} ${body}`)) issues.push("Copy sounds generic instead of describing a real customer situation.");
+  if (/^(everyone|anyone|people|customers?)$/.test(audience)) issues.push("Audience is too broad to create targeted content.");
   if (!hookRelevant) issues.push("Hook needs a clearer product connection.");
   if (!bodyRelevant) issues.push("Supporting line needs a clearer product connection.");
+  if (!specific) issues.push("Use a concrete detail from the campaign brief.");
+  if (!bodyContinuesHook && !bodySpecific && genericCopy.test(body)) issues.push("Supporting line must directly explain or continue the hook.");
   if (!hasAngle) issues.push("Hook needs a clearer curiosity, value, proof, or pain angle.");
   if (hook.length < 18 || hook.length > 105) issues.push("Hook must be 18–105 characters.");
   if (body.length < 45 || body.length > 145) issues.push("Supporting line must be 45–145 characters.");
   if (cta.length < 8 || cta.length > 34) issues.push("Call to action must be 8–34 characters.");
-  return { score: Math.max(0, 100 - issues.length * 25), issues };
+  if (caption && caption.length < 140) issues.push("Caption needs enough useful information to stand on its own.");
+  if (caption && !descriptionWords.some(word => caption.toLowerCase().includes(word))) issues.push("Caption needs a concrete campaign detail.");
+  if (/\?$/.test(hook) && caption && caption.split("?").pop().trim().length < 80) issues.push("Caption must answer the hook's question.");
+  if (!captionFulfillsPromise(idea)) issues.push("Caption must fulfill every numbered promise in the hook.");
+  return { score: Math.max(0, 100 - issues.length * 12), issues };
 }
 
 function petIdeas(input) {
@@ -303,51 +319,51 @@ function marketIdeas(input, profile) {
     `${product} helps people avoid common mistakes around ${topic}.`,
     `${product} creates clearer expectations around ${topic}.`,
     `${product} makes ${topic} easier to remember and recommend.`,
-    `${product} gives people a simple way to prepare for ${moment}.`,
+    `${product} helps people prepare with ${proof}.`,
     `${product} makes the reason to choose ${topic} easier to explain.`,
     `${product} helps people choose ${topic} with more intention.`,
     `${product} turns a vague ${topic} decision into four clear checks.`,
-    `${product} explains why now can be the right time for ${topic}.`,
-    `${product} makes the first step toward ${outcome} feel doable.`,
+    `${product} makes now useful by helping ${audience} ${action}.`,
+    `${product} makes the first step toward ${outcome} concrete with ${proof}.`,
     `${product} helps people compare ${topic} using the details that matter.`,
     `${product} makes the next step toward ${outcome} clear and specific.`
   ];
   const templates = [
-    ["Story", `POV: ${audience} discover ${topic} chosen with care`, `${product} helps ${audience} move from ${pain} to ${outcome}.`, `Explore ${product}`],
+    ["Story", `POV: ${audience} find ${topic} that fits the moment`, `${product} helps ${audience} move from ${pain} to ${outcome}.`, `Explore ${product}`],
     ["Educate", `3 signs it is time to try ${product}`, `${product} gives ${audience} ${benefit} without the usual uncertainty.`, "Save these three signs"],
     ["Promote", `Meet ${product}: ${benefit}`, `${product} combines ${proof} for ${audience}.`, `Choose ${product}`],
     ["Story", `Before ${moment}, consider ${product}`, `${product} turns ${topic} into a clearer decision for ${audience}.`, "Plan it with confidence"],
     ["Educate", `Why you should not settle for ${pain}`, `${product} makes ${topic} clearer with useful details and support people can trust.`, "Know what to look for"],
     ["Promote", `How ${product} helps ${audience} ${action}`, `${product} offers ${benefit} around what matters most.`, "See how it works"],
-    ["Story", `The small detail people remember about ${topic}`, `${product} focuses on the details ${audience} notice first and remember later.`, "Notice the difference"],
+    ["Story", `Why proof changes how people choose ${topic}`, `${product} shows ${proof} in a way ${audience} can understand quickly.`, "Notice the difference"],
     ["Educate", `Before you book ${topic}, ask these three questions`, `The right questions help ${audience} avoid ${risk} and choose the option that actually fits.`, "Use these questions"],
-    ["Promote", `Why ${audience} choose ${product} when details matter`, `${product} combines ${proof} so the decision feels less rushed and more reliable.`, "Start your plan"],
-    ["Story", `Why planning ${moment} earlier feels better`, `${product} gives ${audience} a calmer way to plan, compare, and choose.`, "Start earlier"],
+    ["Promote", `Why ${audience} choose ${product} for ${topic}`, `${product} combines ${proof} so ${audience} can choose with more confidence.`, "Start your plan"],
+    ["Story", `Why planning ${moment} earlier changes the outcome`, `${product} helps ${audience} prepare for ${moment} with ${proof}.`, "Start earlier"],
     ["Educate", `The difference between cheap and truly valuable ${topic}`, `Value comes from fit, trust, timing, and the details that prevent disappointment later.`, "Compare the right way"],
     ["Promote", `How ${product} makes ${outcome} simpler`, `${product} helps ${audience} skip the guesswork and focus on the result they actually want.`, "Get the better result"],
     ["Story", `How ${product} helps ${audience} know they chose well`, `${product} creates confidence with ${proof}.`, "Look for this moment"],
-    ["Educate", `How to tell if ${topic} is the right fit`, `Look for clear communication, proof of care, and a result that matches your real situation.`, "Check the fit first"],
+    ["Educate", `How to tell if ${topic} matches what you actually need`, `${product} makes the choice clearer with ${proof}.`, "Check the fit first"],
     ["Promote", `Turn ${pain} into ${outcome}`, `${product} makes ${action} feel less overwhelming and more doable for ${audience}.`, "Make it easier"],
     ["Story", `One thoughtful detail can change the whole experience`, `${product} uses small, intentional choices to make ${topic} feel more personal and less generic.`, "Lead with the detail"],
     ["Educate", `What ${audience} should know before choosing ${topic}`, `The best choice solves the practical need and feels right for the moment, budget, and person.`, "Save this before choosing"],
-    ["Promote", `Why ${product} brings ${benefit} closer`, `${product} gives ${audience} a focused way to get the result without sorting through endless options.`, "Find your best option"],
-    ["Story", `From unsure to excited: the ${product} difference`, `${product} helps ${audience} replace hesitation with a clearer next step.`, "Take the next step"],
+    ["Promote", `Why ${product} brings ${benefit} closer`, `${product} connects ${benefit} to ${outcome}.`, "Find your best option"],
+    ["Story", `From unsure to excited: the ${product} difference`, `${product} uses ${proof} to make the next step feel clearer.`, "Take the next step"],
     ["Educate", `How to avoid ${risk}`, `Start with the outcome, compare the details, and choose the option that can explain exactly what happens next.`, "Avoid the common mistake"],
     ["Promote", `Get ${topic} without the usual stress`, `${product} helps ${audience} get ${outcome} with clearer expectations and fewer surprises.`, "Make it less stressful"],
     ["Story", `Why people remember a great ${topic} experience`, `People remember how easy it felt, how well the details fit, and whether the result matched the promise.`, "Create a memorable moment"],
-    ["Educate", `The easiest way to make ${moment} feel smoother`, `Decide what matters most, choose support early, and keep the details simple enough to follow.`, "Use the simple plan"],
+    ["Educate", `The easiest way to make ${moment} feel smoother`, `${product} helps ${audience} prepare for ${moment} with ${proof}.`, "Use the simple plan"],
     ["Promote", `Why ${product} makes the choice clearer for ${audience}`, `${product} pairs ${proof} with a direct path from interest to action.`, "Choose with clarity"],
-    ["Story", `The best ${topic} is rarely the most random choice`, `${product} helps ${audience} choose with intention instead of hoping the details work out.`, "Choose intentionally"],
+    ["Story", `The best ${topic} starts with a more intentional choice`, `${product} gives ${audience} ${proof} before they commit.`, "Choose intentionally"],
     ["Educate", `4 things to check before saying yes to ${topic}`, `Check the fit, timeline, proof, and communication before you commit.`, "Save the four checks"],
     ["Promote", `Why ${product} is worth considering now`, `${product} helps ${audience} avoid ${pain} and move toward ${outcome}.`, "Consider it today"],
-    ["Story", `A real result starts with one clear ${product} decision`, `${product} gives ${audience} a practical first step toward ${outcome}.`, "Make the first decision"],
+    ["Story", `A real result starts with one clear ${product} decision`, `${product} starts with ${proof}.`, "Make the first decision"],
     ["Educate", `How to choose ${topic} with more confidence`, `Compare the outcome, proof, process, and support instead of choosing from surface details alone.`, "Choose with confidence"],
     ["Promote", `Ready for ${outcome}? Start with ${product}`, `${product} helps ${audience} ${action} with fewer doubts and a clearer reason to act.`, `Start with ${product}`]
   ];
   const promiseDetails = {
     1: `Three signs ${product} may be the right fit:\n1. You want ${benefit}.\n2. You are tired of ${pain}.\n3. You want a choice that feels clear before you commit.`,
-    7: `Ask these three questions before booking:\n1. What exactly is included?\n2. What should happen next?\n3. How will the result match ${moment}?`,
-    25: `Four checks before saying yes:\n1. Fit: does it match the real need?\n2. Timeline: can it work for the moment?\n3. Proof: is the value clear?\n4. Communication: do you know what happens next?`
+    7: `Ask these three questions before booking:\n1. How will this help you ${action}?\n2. Can you see proof such as ${proof}?\n3. How does it prevent ${risk}?`,
+    25: `Four checks before saying yes:\n1. Need: will it help you ${action}?\n2. Timing: can it work for ${moment}?\n3. Proof: look for ${proof}.\n4. Risk: can it help prevent ${risk}?`
   };
   const usedBodies = new Set();
   return templates.map(([format, hook, body, cta], index) => {
@@ -386,6 +402,7 @@ function localIdeas(input) {
   const audience = rawAudience.split(/,| and | who /i)[0].trim() || "busy teams";
   const description = clean(input.description, 240) || "get better results with less busywork";
   const sentence = description.replace(/[.!?]+$/, "");
+  if (/\b(dog|puppy|cat|kitten|pet)\b/i.test(sentence) && !/grooming|service|owner|salon|appointment/i.test(sentence)) return petIdeas(input);
   const fallbackTopic = sentence
     .replace(/^(help|scan|create|build|make|plan|find|turn|organize|diagnose|generate)\s+/i, "")
     .split(/,| and | by | with | without /i)[0]
@@ -395,6 +412,12 @@ function localIdeas(input) {
     .join(" ")
     .toLowerCase();
   const profiles = [
+    [/clothing|apparel|t-?shirt|vintage pants|fashion|streetwear|outfit|retro style/i, {
+      mode: "market", category: "Fashion", seo: "retro clothing", audience,
+      topic: "retro-inspired everyday outfits", pain: "generic outfits that do not feel personal", outcome: "an outfit that feels confident and unmistakably yours",
+      action: "build a dark retro look with statement pieces", benefit: "retro graphics, vintage-inspired pants, and confident everyday style",
+      proof: "distinctive dark designs, wearable statement pieces, and easy outfit combinations", risk: "forgettable basics, awkward outfit pairings, and trend-chasing without personal style", moment: "the next night out or everyday outfit"
+    }],
     [/bakery|cake|pastr|sourdough|bread/i, {
       mode: "market", category: "Bakery", seo: "custom cakes", audience,
       topic: "custom cakes and fresh pastries", pain: "last-minute dessert stress", outcome: "a celebration that feels personal and tastes fresh",
@@ -447,7 +470,7 @@ function localIdeas(input) {
       mode: "market", category: "Plumbing", seo: "emergency plumber", audience,
       topic: "fast plumbing help", pain: "leaks, clogs, and home repairs that cannot wait", outcome: "a safer, working home again",
       action: "book drain cleaning, leak repair, or water heater service", benefit: "quick response and clear repair options",
-      proof: "emergency service, practical diagnostics, and straightforward next steps", risk: "water damage, repeat clogs, and surprise repair costs", moment: "a plumbing emergency"
+      proof: "emergency drain cleaning, leak repair, and water heater diagnostics", risk: "water damage, repeat clogs, and surprise repair costs", moment: "a plumbing emergency"
     }],
     [/photograph|wedding|portrait|camera|engaged/i, {
       mode: "market", category: "Photography", seo: "wedding photographer", audience,
@@ -567,7 +590,7 @@ function localIdeas(input) {
       mode: "market", category: "Creative Workshops", seo: "beginner pottery class", audience,
       topic: "beginner-friendly pottery workshops", pain: "wanting a creative hobby but not knowing where to start", outcome: "a relaxing weekend spent making something real",
       action: "try pottery in a welcoming beginner class", benefit: "hands-on guidance, creative time, and a finished piece",
-      proof: "beginner instruction, provided materials, and a relaxed small-group setting", risk: "intimidating classes, missing supplies, and never making time to begin", moment: "the next free weekend"
+      proof: "beginner pottery instruction, provided materials, and a relaxed weekend workshop", risk: "intimidating classes, missing supplies, and never making time to begin", moment: "the next free weekend"
     }],
     [/section 508|wcag|accessib/i, {
       topic: "accessibility preflight", pain: "last-minute accessibility issues",
@@ -609,7 +632,6 @@ function localIdeas(input) {
     risk: "unclear options, rushed decisions, and disappointing results", moment: "the next important decision"
   }])[1];
   if (profile.mode === "market") return marketIdeas(input, profile);
-  if (/\b(dog|puppy|cat|kitten|pet)\b/i.test(sentence)) return petIdeas(input);
   const { topic, pain, outcome, action, proof, asset, risk } = profile;
   const topicArticle = /^[aeiou]/i.test(topic) ? "an" : "a";
   const captionDetails = [
@@ -696,11 +718,48 @@ function localIdeas(input) {
 
 async function ollamaIdeas(input) {
   if (!OLLAMA_MODEL) return null;
-  const prompt = `Create exactly 30 distinct short-form video ideas as a JSON array. Each object needs day, format (Story, Educate, or Promote), hook, body, cta, and caption. Every body must be unique, directly continue its hook, include naturally relevant search keywords, deliver one useful insight, and stay under 145 characters. Every CTA must be unique, specific to the idea, and under 34 characters. Every caption must fully deliver on the hook; if a hook promises a numbered list, the caption must contain that exact number of useful items. Never repeat a generic product-description sentence. Product: ${clean(input.product, 80)}. Audience: ${clean(input.audience, 120)}. Description: ${clean(input.description, 240)}. Goal: ${clean(input.goal, 80)}. Return JSON only.`;
+  const schema = {
+    type: "object",
+    properties: {
+      ideas: {
+        type: "array",
+        minItems: 30,
+        maxItems: 30,
+        items: {
+          type: "object",
+          properties: {
+            format: { type: "string", enum: ["Story", "Educate", "Promote"] },
+            hook: { type: "string" },
+            body: { type: "string" },
+            cta: { type: "string" },
+            caption: { type: "string" }
+          },
+          required: ["format", "hook", "body", "cta", "caption"]
+        }
+      }
+    },
+    required: ["ideas"]
+  };
+  const prompt = `Create exactly 30 distinct short-form video post ideas for this campaign. The ideas must be usable online, not placeholder copy.
+
+Quality rules:
+- The hook must be specific, engaging, and relevant to the product, audience, and description.
+- The supporting body must directly answer or continue the hook with a concrete detail from the description.
+- The caption must pay off the hook, include useful information, and fully deliver any numbered promise.
+- Avoid generic phrases like "right fit", "chosen with care", "clear value", "straightforward next step", or "details matter".
+- Do not invent capabilities beyond the description.
+- Keep hook <= 105 characters, body <= 145 characters, cta <= 34 characters.
+
+Product: ${clean(input.product, 80)}
+Audience: ${clean(input.audience, 120)}
+Description: ${clean(input.description, 240)}
+Goal: ${clean(input.goal, 80)}
+
+Return only JSON matching this schema: ${JSON.stringify(schema)}`;
   const response = await fetch(`${OLLAMA_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: false, format: "json" }),
+    body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: false, format: schema }),
     signal: AbortSignal.timeout(45_000)
   });
   if (!response.ok) throw new Error("Local AI did not respond.");

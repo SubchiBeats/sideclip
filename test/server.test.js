@@ -65,6 +65,15 @@ test("offline generator does not leak internal workflow labels into video briefs
   assert.ok(ideas.every(idea => ideaQuality(idea, { product: "SideClip", description: "ship video faster" }).score === 100));
 });
 
+test("fashion briefs create specific posts and broad audiences lower readiness", () => {
+  const description = "Provides retro style T shirts and vintage pants with cool dark designs that help people dress with confidence.";
+  const targeted = { product: "ClothingIO", audience: "21-30 retro fashion buyers", description };
+  assert.ok(localIdeas(targeted).every(idea => ideaQuality(idea, targeted).score === 100));
+
+  const broad = { ...targeted, audience: "everyone" };
+  assert.ok(localIdeas(broad).every(idea => ideaQuality(idea, broad).score < 100));
+});
+
 test("password hashes are salted and verifiable", async () => {
   const first = await hashPassword("correct horse battery staple");
   const second = await hashPassword("correct horse battery staple");

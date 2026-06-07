@@ -73,6 +73,10 @@ npm start
 
 Prompts stay between SideClip and your configured Ollama server.
 
+On Windows, after installing Ollama and pulling the model once, you can also
+double-click `run-local-ai.ps1`. SideClip uses schema-constrained output and
+its publish-readiness checks to reject weak local-model suggestions.
+
 ## Architecture
 
 ```text

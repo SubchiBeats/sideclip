@@ -56,5 +56,7 @@ test("hero, dark actions, narration, and platform captions are polished", () => 
   assert.match(app, /function voiceScore/);
   assert.match(app, /utterance\.rate/);
   assert.match(app, /function platformCaption/);
+  assert.match(app, /captionVariant/);
+  assert.match(app, /fresh accurate angle/);
   assert.match(app, /fitTextBlock\(ctx, hook, 310, 8, 34, 13, 800\)/);
 });

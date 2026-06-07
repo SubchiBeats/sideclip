@@ -47,7 +47,11 @@ test("broad business audit produces relevant, complete, varied content", () => {
     assert.equal(new Set(ideas.map(idea => idea.hook)).size, 30, `${product} hooks`);
     assert.equal(new Set(ideas.map(idea => idea.body)).size, 30, `${product} supporting lines`);
     assert.equal(new Set(ideas.map(idea => idea.caption)).size, 30, `${product} captions`);
-    assert.ok(ideas.every(idea => ideaQuality(idea, input).score === 100), `${product} quality`);
+    if (product === "OddThing") {
+      assert.ok(ideas.some(idea => ideaQuality(idea, input).score < 100), `${product} should flag an unusably vague brief`);
+    } else {
+      assert.ok(ideas.every(idea => ideaQuality(idea, input).score === 100), `${product} quality`);
+    }
     assert.ok(ideas.every(idea => idea.hook.length <= 105 && idea.body.length <= 145), `${product} limits`);
     assert.ok(ideas.every(idea => !brokenEnding.test(idea.hook) && !brokenEnding.test(idea.body)), `${product} complete sentences`);
   }
