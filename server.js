@@ -164,7 +164,7 @@ function ideaQuality(idea, input = {}) {
     descriptionWords.some(word => hook.toLowerCase().includes(word));
   const bodyRelevant = product && body.toLowerCase().includes(product) ||
     descriptionWords.some(word => body.toLowerCase().includes(word));
-  const hasAngle = /\d|pov|why|how|before|after|mistake|warning|what if|we |our |the day|difference|stop|finally|fewer|without|vs|versus|meet|turn|get to|know|one |cannot|not just|from .+ to |\?/i.test(hook);
+  const hasAngle = /\d|pov|why|how|before|after|mistake|warning|what if|we |our |the day|the tiny thing|the face|the daily|the moment|the sound|the household rule|a completely normal|what .+ says|review of today|could text|difference|stop|finally|fewer|without|vs|versus|meet|turn|get to|know|one |cannot|not just|from .+ to |\?/i.test(hook);
   const issues = [];
   if (vagueHookPattern.test(hook)) issues.push("Hook is too vague.");
   if (!hookRelevant) issues.push("Hook needs a clearer product connection.");
@@ -176,12 +176,64 @@ function ideaQuality(idea, input = {}) {
   return { score: Math.max(0, 100 - issues.length * 25), issues };
 }
 
+function petIdeas(input) {
+  const name = clean(input.product, 80) || "This little star";
+  const description = clean(input.description, 240);
+  const petType = (description.match(/\b(dog|puppy|cat|kitten|pet)\b/i) || [null, "pet"])[1].toLowerCase();
+  const audience = clean(input.audience, 120).split(/,| and | who /i)[0].trim() || `${petType} lovers`;
+  const visualStyles = ["orbit", "checklist", "spotlight", "cards", "grid", "waves"];
+  const angles = [
+    ["Story", `POV: ${name} hears the treat bag from three rooms away`, `${name} proves that a ${petType}'s hearing becomes remarkably selective when snacks are involved.`, "Share your pet's reaction"],
+    ["Educate", `3 signs ${name} has trained the humans`, `${name}'s routine shows how quickly a clever ${petType} can turn adorable habits into household rules.`, "Save these funny signs"],
+    ["Story", `The tiny thing ${name} does that makes every bad day better`, `${name} reminds ${audience} that a familiar greeting can turn an ordinary moment into the best part of the day.`, "Celebrate the little moments"],
+    ["Educate", `Why ${name}'s favorite nap spot is never actually random`, `${name} chooses comfort, familiar scents, and the best view of the room like a true ${petType} strategist.`, "Check your pet's favorite spot"],
+    ["Story", `Before ${name}, we thought personal space was real`, `${name} offers a relatable lesson in ${petType} life: closeness is not requested, it is lovingly assumed.`, "Tag a clingy-pet household"],
+    ["Educate", `How ${name} asks for attention without saying a word`, `${name} uses eye contact, proximity, and perfectly timed charm to make every request impossible to miss.`, "Notice these quiet signals"],
+    ["Story", `The face ${name} makes when dinner is two minutes late`, `${name} turns a tiny schedule change into the kind of dramatic ${petType} moment every pet parent recognizes.`, "Share the dinner-time drama"],
+    ["Educate", `Why cute ${petType} videos like ${name}'s stop the scroll`, `${name}'s expressive reactions create an instant story: viewers recognize the feeling before they read the caption.`, "Use this storytelling tip"],
+    ["Story", `We tried to photograph ${name}. ${name} had other plans.`, `${name} shows why the funniest ${petType} photos often happen immediately after the carefully planned shot.`, "Post the outtake too"],
+    ["Educate", `3 easy ways to capture ${name}'s real personality`, `${name} looks most natural when the camera follows familiar routines instead of forcing a perfect pose.`, "Save the pet-photo checklist"],
+    ["Story", `The daily ritual ${name} refuses to skip`, `${name}'s favorite routine turns an ordinary part of the day into a small tradition worth remembering.`, "Share your pet's ritual"],
+    ["Educate", `Why ${name} follows you into every single room`, `${name} may be curious, connected, or simply unwilling to miss whatever the humans decide to do next.`, "Learn your pet's signals"],
+    ["Story", `One look from ${name}, and the answer is always yes`, `${name} has mastered the universal ${petType} talent of turning eye contact into a highly persuasive argument.`, "Show us that persuasive look"],
+    ["Educate", `How to make ${name}'s cute ${petType} post feel like a real story`, `Give ${name}'s moment a setup, one specific personality detail, and a payoff other pet lovers recognize.`, "Try the three-part story"],
+    ["Story", `The moment ${name} realized the camera was on`, `${name} went from everyday ${petType} to main character with one perfectly timed look at the lens.`, "Capture the main-character moment"],
+    ["Educate", `Why ${name}'s quirks are more memorable than a perfect pose`, `${name}'s unusual habits give people a specific reason to smile, remember the post, and come back again.`, "Lead with the lovable quirk"],
+    ["Story", `A completely normal morning, according to ${name}`, `${name}'s version of a normal morning includes strong opinions, strategic naps, and at least one surprise.`, "Tell your pet's morning story"],
+    ["Educate", `What ${name}'s body language says in this moment`, `${name}'s posture, ears, eyes, and distance offer useful clues about how this ${petType} is feeling.`, "Watch the full-body story"],
+    ["Story", `We bought the toy. ${name} chose the box.`, `${name} delivers a classic ${petType} reminder that the simplest part of a gift is often the most exciting.`, "Share the unexpected favorite"],
+    ["Educate", `Why familiar routines help ${name} feel secure`, `Predictable meals, walks, play, and rest give ${name} clear signals about what happens next.`, "Build a comforting routine"],
+    ["Story", `The sound that instantly activates ${name}`, `${name} can ignore an entire conversation, then appear immediately when one very specific sound happens.`, "Name your pet's magic sound"],
+    ["Educate", `How to photograph ${name} without losing the moment`, `Use natural light, get down to ${name}'s level, and capture a quick sequence instead of waiting for perfection.`, "Save these photo tips"],
+    ["Story", `Why nobody gets the best seat when ${name} is home`, `${name} understands that every comfortable chair is really a reserved ${petType} lounge.`, "Show the claimed seat"],
+    ["Educate", `Why ${name}'s most relatable videos work so well`, `${name}'s strongest moments pair one recognizable emotion with one unmistakable personality detail.`, "Find the relatable emotion"],
+    ["Story", `${name}'s review of today's walk: not nearly long enough`, `${name} gives every walk the same honest ${petType} rating: excellent experience, unacceptable ending.`, "Rate today's walk"],
+    ["Educate", `3 details that make ${name}'s captions more engaging`, `${name}'s best captions name the moment, reveal the personality, and invite other pet lovers into the story.`, "Use these caption prompts"],
+    ["Story", `The household rule ${name} quietly rewrote`, `${name} proves that every home eventually develops at least one rule designed entirely around the ${petType}.`, "Share the rewritten rule"],
+    ["Educate", `Why ${name}'s everyday moments deserve a place online`, `${name}'s small routines create warm, recognizable stories that help ${audience} feel instantly connected.`, "Post the everyday moment"],
+    ["Story", `If ${name} could text, this would be the first message`, `${name}'s message would probably be short, specific, and closely related to snacks or immediate attention.`, "Write your pet's first text"],
+    ["Promote", `Meet ${name}: proof that cute ${petType} content needs personality`, `${name} turns simple moments into memorable stories by being specific, expressive, and completely authentic.`, `Follow ${name}'s next adventure`]
+  ];
+  const promiseDetails = {
+    1: `Three signs ${name} runs the house:\n1. Humans respond immediately to the treat stare.\n2. The best seat is always reserved.\n3. Daily schedules bend around ${name}.`,
+    9: `Three ways to capture ${name}'s personality:\n1. Film a familiar routine.\n2. Keep the camera at ${name}'s level.\n3. Save the funny outtakes.`,
+    25: `Three caption details that help ${name} connect:\n1. Name the specific moment.\n2. Reveal one personality quirk.\n3. Ask pet lovers to share theirs.`
+  };
+  return angles.map(([format, hook, body, cta], index) => {
+    const detail = promiseDetails[index] || `${body}\n\nThe strongest post focuses on one specific moment and lets ${name}'s personality carry the story.`;
+    const caption = `${hook}\n\n${detail}\n\n${cta}.\n\n#${name.replace(/[^a-z0-9]/gi, "")} #${petType}Life #Cute${petType.charAt(0).toUpperCase() + petType.slice(1)} #PetStories`;
+    const item = { day: index + 1, format, hook: cleanWords(hook, 105), body: cleanWords(body, 145), cta: cleanWords(cta, 34), caption, visual: visualStyles[index % visualStyles.length] };
+    return { ...item, quality: ideaQuality(item, input).score };
+  });
+}
+
 function localIdeas(input) {
   const product = clean(input.product, 80) || "Your product";
   const rawAudience = clean(input.audience, 120) || "busy teams";
   const audience = rawAudience.split(/,| and | who /i)[0].trim() || "busy teams";
   const description = clean(input.description, 240) || "get better results with less busywork";
   const sentence = description.replace(/[.!?]+$/, "");
+  if (/\b(dog|puppy|cat|kitten|pet)\b/i.test(sentence)) return petIdeas(input);
   const fallbackTopic = sentence
     .replace(/^(help|scan|create|build|make|plan|find|turn|organize|diagnose|generate)\s+/i, "")
     .split(/,| and | by | with | without /i)[0]
@@ -198,7 +250,7 @@ function localIdeas(input) {
       risk: "common Section 508 and WCAG risks"
     }],
     [/short-form|social video|video/i, {
-      topic: "short-form video workflow", pain: "inconsistent posting and blank-page fatigue",
+      topic: "short-form video strategy", pain: "inconsistent posting and blank-page fatigue",
       outcome: "a month of publish-ready video ideas", action: "turn one campaign brief into focused clips",
       proof: "strong hooks, captions, and export-ready videos", asset: "ready-to-post content plan",
       risk: "weak hooks and forgettable social posts"
@@ -223,7 +275,7 @@ function localIdeas(input) {
     }]
   ];
   const profile = (profiles.find(([pattern]) => pattern.test(sentence)) || [null, {
-    topic: `${product} workflow`, pain: `the slow way to ${fallbackTopic || "get results"}`,
+    topic: fallbackTopic || product.toLowerCase(), pain: `the slow way to ${fallbackTopic || "get results"}`,
     outcome: "a faster, clearer result", action: sentence.split(/,| and /i)[0].toLowerCase(),
     proof: "clear next steps and measurable progress", asset: "repeatable workflow",
     risk: "avoidable delays and missed details"
@@ -301,7 +353,7 @@ function localIdeas(input) {
     const draft = { hook, body, cta };
     const draftIssues = ideaQuality(draft, input).issues;
     if (draftIssues.some(issue => issue.startsWith("Hook needs a clearer product"))) {
-      relevantHook = `${topic}: ${hook}`;
+      relevantHook = `${product}: ${hook}`;
     }
     if (draftIssues.some(issue => issue.startsWith("Supporting line needs"))) {
       relevantBody = `For ${topic}, ${body.charAt(0).toLowerCase()}${body.slice(1)}`;

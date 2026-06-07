@@ -29,7 +29,7 @@ test("video renderer fits supporting copy and centers CTA text", () => {
   assert.doesNotMatch(app, /visible\[maxLines - 1\].*…/);
   assert.match(app, /Publish readiness/);
   assert.match(app, /planNeedsUpgrade/);
-  assert.match(app, /ctx\.rect\(18, 195, 324, 220\)/);
+  assert.match(app, /ctx\.rect\(18, 160, 324, 260\)/);
   assert.match(app, /ctx\.rect\(30, 464, 300, 72\)/);
 });
 
@@ -56,4 +56,5 @@ test("hero, dark actions, narration, and platform captions are polished", () => 
   assert.match(app, /function voiceScore/);
   assert.match(app, /utterance\.rate/);
   assert.match(app, /function platformCaption/);
+  assert.match(app, /fitTextBlock\(ctx, hook, 310, 8, 34, 13, 800\)/);
 });

@@ -427,13 +427,13 @@ function drawFrame(progress = 0) {
   ctx.textBaseline = "alphabetic";
   ctx.fillText(format.toUpperCase(), 40, 41);
 
-  const hookBlock = fitTextBlock(ctx, hook, 310, 6, 34, 18, 800);
+  const hookBlock = fitTextBlock(ctx, hook, 310, 8, 34, 13, 800);
   const hookLineHeight = Math.round(hookBlock.size * 1.08);
   const hookHeight = hookBlock.lines.length * hookLineHeight;
-  const hookY = Math.max(205, 410 - hookHeight);
+  const hookY = Math.max(170, 414 - hookHeight);
   ctx.save();
   ctx.beginPath();
-  ctx.rect(18, 195, 324, 220);
+  ctx.rect(18, 160, 324, 260);
   ctx.clip();
   drawTextBlock(ctx, hookBlock, 25, hookY, hookLineHeight, "#ffffff");
   ctx.restore();

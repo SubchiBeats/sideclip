@@ -46,6 +46,25 @@ test("offline supporting copy stays concise for long campaign briefs", () => {
   }).score === 100));
 });
 
+test("offline generator adapts to personality and pet briefs", () => {
+  const input = { product: "mork", audience: "dog lovers", description: "mork is a cute dog" };
+  const ideas = localIdeas(input);
+  assert.equal(ideas.length, 30);
+  assert.ok(ideas.every(idea => /mork|dog/i.test(`${idea.hook} ${idea.body} ${idea.caption}`)));
+  assert.ok(ideas.every(idea => !/workflow/i.test(`${idea.hook} ${idea.body}`)));
+  assert.ok(ideas.every(idea => ideaQuality(idea, input).score === 100));
+  assert.match(ideas[1].caption, /1\./);
+  assert.match(ideas[1].caption, /2\./);
+  assert.match(ideas[1].caption, /3\./);
+});
+
+test("offline generator does not leak internal workflow labels into video briefs", () => {
+  const ideas = localIdeas({ product: "SideClip", audience: "creators", description: "ship video faster" });
+  const joined = ideas.map(idea => `${idea.hook} ${idea.body} ${idea.caption}`).join(" ");
+  assert.doesNotMatch(joined, /short-form video workflow/i);
+  assert.ok(ideas.every(idea => ideaQuality(idea, { product: "SideClip", description: "ship video faster" }).score === 100));
+});
+
 test("password hashes are salted and verifiable", async () => {
   const first = await hashPassword("correct horse battery staple");
   const second = await hashPassword("correct horse battery staple");
