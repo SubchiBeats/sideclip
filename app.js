@@ -123,10 +123,29 @@ async function generatePlan() {
   } catch {
     const selected = $$(".choice input:checked").map(i => i.value);
     const formats = selected.length ? selected : ["Story", "Educate", "Promote"];
+    const support = [
+      "Catch the risk early, make the fix clear, and protect the final handoff.",
+      "Turn a complicated review into a focused list of practical next steps.",
+      "Document what was checked, what changed, and what still needs a person.",
+      "Move review upstream so the team can fix issues before approvals stack up.",
+      "Give every reviewer the same findings, priorities, and remaining risks.",
+      "Find repeat problems across the whole project instead of one file at a time.",
+      "Pair repeatable automated checks with visible, accountable human review.",
+      "Replace last-minute guesswork with a consistent delivery-ready process.",
+      "Explain the impact and the fix so feedback becomes action, not noise.",
+      "Create a credible record of the work behind every confident delivery."
+    ];
+    const actions = ["See the workflow", "Save the checklist", "Start a private review", "Review before delivery", "Build your action plan", "Document the work", "Catch issues earlier", "Simplify the handoff", "Try the three-step method", `Explore ${values.product}`];
     state.plan = Array.from({length: 30}, (_, index) => {
       const format = formats[index % formats.length];
       const hook = fill(templates[format][Math.floor(index / formats.length) % templates[format].length], values);
-      return { day: index + 1, format, hook, body: `${values.product} helps ${values.audience} ${values.result}.`, cta: `Try ${values.product} today →` };
+      const cycle = Math.floor(index / support.length);
+      const context = cycle === 1 ? ` Built for ${values.audience.split(",")[0]}.` : cycle === 2 ? ` Make it part of your next ${values.product} campaign.` : "";
+      return {
+        day: index + 1, format, hook,
+        body: `${support[index % support.length]}${context}`,
+        cta: actions[(index + cycle) % actions.length]
+      };
     });
     toast("Using the built-in offline generator.");
   } finally {
@@ -212,6 +231,44 @@ function wrapText(context, text, maxWidth) {
   return lines;
 }
 
+function fitTextBlock(context, text, maxWidth, maxLines, startSize, minSize, weight = 700) {
+  let size = startSize;
+  let lines = [];
+  while (size >= minSize) {
+    context.font = `${weight} ${size}px Manrope`;
+    lines = wrapText(context, text, maxWidth);
+    if (lines.length <= maxLines) return { lines, size };
+    size -= 1;
+  }
+  context.font = `${weight} ${minSize}px Manrope`;
+  lines = wrapText(context, text, maxWidth);
+  const visible = lines.slice(0, maxLines);
+  if (lines.length > maxLines) {
+    let last = visible[maxLines - 1];
+    while (last && context.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1).trim();
+    visible[maxLines - 1] = `${last}…`;
+  }
+  return { lines: visible, size: minSize };
+}
+
+function drawTextBlock(context, block, x, y, lineHeight, color) {
+  context.fillStyle = color;
+  context.font = `700 ${block.size}px Manrope`;
+  context.textAlign = "left";
+  context.textBaseline = "top";
+  block.lines.forEach((line, index) => context.fillText(line, x, y + index * lineHeight));
+}
+
+function fitSingleLine(context, text, maxWidth, startSize, minSize, weight = 800) {
+  let size = startSize;
+  while (size > minSize) {
+    context.font = `${weight} ${size}px Manrope`;
+    if (context.measureText(text).width <= maxWidth) break;
+    size -= 1;
+  }
+  return size;
+}
+
 function drawFrame(progress = 0) {
   const { format, hook, body, cta, color } = state.current;
   ctx.fillStyle = "#11110f";
@@ -247,26 +304,54 @@ function drawFrame(progress = 0) {
   roundedRect(ctx, 24, 26, 82, 23, 12);
   ctx.fillStyle = "#11110f";
   ctx.font = "700 9px Manrope";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
   ctx.fillText(format.toUpperCase(), 40, 41);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "800 35px Manrope";
-  const hookLines = wrapText(ctx, hook, 305).slice(0, 5);
-  hookLines.forEach((line, i) => ctx.fillText(line, 25, 315 + i * 38));
-  if (progress > .38) {
-    ctx.globalAlpha = Math.min(1, (progress - .38) * 4);
-    ctx.font = "500 14px Manrope";
-    ctx.fillStyle = "#deddd6";
-    wrapText(ctx, body, 300).slice(0, 3).forEach((line, i) => ctx.fillText(line, 26, 505 + i * 20));
-    ctx.globalAlpha = 1;
-  }
+
+  const hookBlock = fitTextBlock(ctx, hook, 310, 4, 36, 27, 800);
+  const hookLineHeight = Math.round(hookBlock.size * 1.08);
+  const hookHeight = hookBlock.lines.length * hookLineHeight;
+  const hookY = Math.max(250, 405 - hookHeight);
+  drawTextBlock(ctx, hookBlock, 25, hookY, hookLineHeight, "#ffffff");
+
+  ctx.globalAlpha = progress === 0 ? 1 : Math.min(1, .45 + progress * 1.8);
+  ctx.fillStyle = "#11110fcc";
+  roundedRect(ctx, 18, 430, 324, 116, 16);
+  ctx.strokeStyle = color + "77";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(18.5, 430.5, 323, 115, 15.5);
+  ctx.stroke();
   ctx.fillStyle = color;
-  roundedRect(ctx, 24, 575, 312, 42, 21);
+  ctx.font = "700 8px DM Mono";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText("WHY IT MATTERS", 32, 446);
+  const bodyBlock = fitTextBlock(ctx, body, 296, 4, 14, 11, 600);
+  drawTextBlock(ctx, bodyBlock, 32, 466, Math.round(bodyBlock.size * 1.28), "#f2efe5");
+  ctx.globalAlpha = 1;
+
+  ctx.shadowColor = "#00000066";
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 5;
+  const ctaGradient = ctx.createLinearGradient(24, 574, 336, 620);
+  ctaGradient.addColorStop(0, color);
+  ctaGradient.addColorStop(1, "#ffffff");
+  ctx.fillStyle = ctaGradient;
+  roundedRect(ctx, 24, 574, 312, 46, 23);
+  ctx.shadowColor = "transparent";
   ctx.fillStyle = "#11110f";
-  ctx.font = "800 12px Manrope";
-  ctx.fillText(cta, 43, 601);
+  const ctaLabel = `${cta}  →`;
+  const ctaSize = fitSingleLine(ctx, ctaLabel, 270, 13, 10);
+  ctx.font = `800 ${ctaSize}px Manrope`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(ctaLabel, 180, 597);
   ctx.fillStyle = "#ffffff88";
   ctx.font = "500 8px DM Mono";
-  ctx.fillText("MADE WITH SIDECLIP", 24, 555);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("MADE WITH SIDECLIP", 24, 563);
 }
 
 function updatePreview() { drawFrame(state.previewFrame); }

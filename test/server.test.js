@@ -13,6 +13,24 @@ test("offline generator returns thirty structured ideas", () => {
   assert.equal(ideas.length, 30);
   assert.deepEqual(new Set(ideas.map(idea => idea.format)), new Set(["Story", "Educate", "Promote"]));
   assert.ok(ideas.every(idea => idea.hook && idea.body && idea.cta));
+  assert.equal(new Set(ideas.map(idea => idea.hook)).size, 30);
+  assert.equal(new Set(ideas.map(idea => idea.body)).size, 30);
+  assert.equal(new Set(ideas.map(idea => idea.cta)).size, 30);
+  assert.ok(ideas.every(idea => idea.body.length <= 170));
+  assert.ok(ideas.every(idea => idea.cta.length <= 42));
+});
+
+test("offline supporting copy stays concise for long campaign briefs", () => {
+  const ideas = localIdeas({
+    product: "AccessReady",
+    audience: "Government contractors, communications teams, small agencies, universities, nonprofits, and public-sector freelancers",
+    description: "Scan mixed-format communications deliverables for common Section 508 and WCAG accessibility risks, explain fixes in plain English, organize remediation, and generate client-ready evidence packs before content is published or delivered."
+  });
+  assert.equal(new Set(ideas.map(idea => idea.body)).size, 30);
+  assert.ok(ideas.every(idea => idea.body.length <= 170));
+  assert.ok(ideas.every(idea => !idea.body.endsWith(" scan")));
+  assert.match(ideas.map(idea => idea.body).join(" "), /preflight|review|delivery|evidence/i);
+  assert.match(ideas[0].body, /accessibility preflight/i);
 });
 
 test("password hashes are salted and verifiable", async () => {

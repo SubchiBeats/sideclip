@@ -19,3 +19,10 @@ test("literal app id selectors exist in the document", () => {
   const missing = [...new Set(selectors)].filter(id => !html.includes(`id="${id}"`));
   assert.deepEqual(missing, []);
 });
+
+test("video renderer fits supporting copy and centers CTA text", () => {
+  assert.match(app, /fitTextBlock/);
+  assert.match(app, /fitSingleLine/);
+  assert.match(app, /ctx\.textAlign = "center"/);
+  assert.doesNotMatch(app, /wrapText\(ctx, body, 300\)\.slice\(0, 3\)/);
+});

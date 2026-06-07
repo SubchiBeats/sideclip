@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const fsp = fs.promises;
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { version: VERSION } = require("./package.json");
 
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, "data");
@@ -139,33 +140,98 @@ async function saveDb() {
 
 function localIdeas(input) {
   const product = clean(input.product, 80) || "Your product";
-  const audience = clean(input.audience, 120) || "your audience";
-  const result = clean(input.description, 240) || "get a better result";
-  const types = ["Story", "Educate", "Promote"];
-  const hooks = [
-    `POV: ${audience} finally found a better way`,
-    `3 mistakes stopping ${audience} from moving faster`,
-    `Meet ${product}: less busywork, more progress`,
-    `The moment I stopped doing everything the hard way`,
-    `A simple framework to ${result.toLowerCase()}`,
-    `What if ${result.toLowerCase()} felt easy?`,
-    `I thought I needed more discipline. I needed a better system.`,
-    `Try this before you add another task`,
-    `${product} was built for people who are done settling`,
-    `A day in the life after simplifying the work`
+  const rawAudience = clean(input.audience, 120) || "busy teams";
+  const audience = rawAudience.split(/,| and | who /i)[0].trim() || "busy teams";
+  const description = clean(input.description, 240) || "get better results with less busywork";
+  const sentence = description.replace(/[.!?]+$/, "");
+  const fallbackTopic = sentence
+    .replace(/^(help|scan|create|build|make|plan|find|turn|organize|diagnose|generate)\s+/i, "")
+    .split(/,| and | by | with | without /i)[0]
+    .trim()
+    .split(/\s+/)
+    .slice(0, 5)
+    .join(" ")
+    .toLowerCase();
+  const profiles = [
+    [/section 508|wcag|accessib/i, {
+      topic: "accessibility preflight", pain: "last-minute accessibility issues",
+      outcome: "a confident, documented handoff", action: "scan mixed-format deliverables",
+      proof: "plain-English fixes and visible remaining risks", asset: "client-ready evidence pack",
+      risk: "common Section 508 and WCAG risks"
+    }],
+    [/short-form|social video|video/i, {
+      topic: "short-form video workflow", pain: "inconsistent posting and blank-page fatigue",
+      outcome: "a month of publish-ready video ideas", action: "turn one campaign brief into focused clips",
+      proof: "strong hooks, captions, and export-ready videos", asset: "ready-to-post content plan",
+      risk: "weak hooks and forgettable social posts"
+    }],
+    [/job search|resume|application/i, {
+      topic: "job-search workflow", pain: "scattered applications and repetitive admin",
+      outcome: "a calmer, more organized job search", action: "track opportunities and tailor applications",
+      proof: "clear status, notes, and next steps", asset: "organized application pipeline",
+      risk: "missed follow-ups and generic applications"
+    }],
+    [/audio|driver|dj controller/i, {
+      topic: "audio troubleshooting", pain: "unexplained dropouts and device conflicts",
+      outcome: "a stable, performance-ready setup", action: "diagnose drivers, power, and optimizer conflicts",
+      proof: "prioritized findings and practical fixes", asset: "diagnostic action plan",
+      risk: "hidden Windows audio conflicts"
+    }],
+    [/science|lab|dilution|biomolecule/i, {
+      topic: "lab calculations", pain: "slow calculations and preventable setup errors",
+      outcome: "faster, more confident bench work", action: "calculate dilutions and solution prep",
+      proof: "clear formulas, units, and reproducible results", asset: "reliable calculation workflow",
+      risk: "unit mistakes and wasted reagents"
+    }]
   ];
-  return Array.from({ length: 30 }, (_, index) => ({
+  const profile = (profiles.find(([pattern]) => pattern.test(sentence)) || [null, {
+    topic: fallbackTopic || "a better workflow", pain: "slow, fragmented work",
+    outcome: "a faster, clearer result", action: sentence.split(/,| and /i)[0].toLowerCase(),
+    proof: "clear next steps and measurable progress", asset: "repeatable workflow",
+    risk: "avoidable delays and missed details"
+  }])[1];
+  const { topic, pain, outcome, action, proof, asset, risk } = profile;
+  const ideas = [
+    ["Story", `POV: ${audience} finally leave ${pain} behind`, `A consistent ${topic} turns stressful last-minute work into ${outcome}.`, "See the better workflow"],
+    ["Educate", `3 warning signs ${risk} are slowing you down`, `Catch the pattern early, prioritize the highest-impact fix, and protect the final result.`, "Save this quick checklist"],
+    ["Promote", `Meet ${product}: a smarter way to ${action}`, `${product} turns complex work into ${proof}.`, `Explore ${product}`],
+    ["Story", `The deadline was tomorrow. Then we found the problem.`, `Building ${topic} into the process creates time to fix issues before they become emergencies.`, "Fix it before the deadline"],
+    ["Educate", `The simplest way to improve your ${topic}`, `Start with one repeatable check, document the result, then act on the clearest next step.`, "Try the three-step method"],
+    ["Promote", `What if ${outcome} felt routine?`, `${product} helps ${audience} ${action} without adding another complicated system.`, "See how it works"],
+    ["Story", `We stopped treating ${topic} like a final-minute task`, `Moving the work earlier created fewer surprises and a much clearer path to ${outcome}.`, "Build a calmer process"],
+    ["Educate", `Do this before you call the work finished`, `Confirm the outcome, record the evidence, and keep the decisions that need human judgment visible.`, "Use this before delivery"],
+    ["Promote", `${product} was built for ${audience}`, `Get ${proof} in one focused workflow designed around the work you actually need to ship.`, "See what is included"],
+    ["Story", `A day in the life after solving ${pain}`, `Less chasing. Fewer surprises. More time focused on work that moves the project forward.`, "Make the day easier"],
+    ["Educate", `Why one task at a time can hide the bigger problem`, `A complete view reveals repeat patterns and gaps that isolated checks often miss.`, "Look at the whole workflow"],
+    ["Promote", `One workspace. Clearer next steps.`, `${product} brings scattered work into one practical ${asset}.`, "Create your action plan"],
+    ["Story", `They asked how we knew it was ready. We had the answer.`, `Clear evidence turns a vague promise into a confident, credible result everyone can understand.`, "Document the result"],
+    ["Educate", `The difference between doing the work and proving it`, `Strong workflows record the method, result, open questions, and owner of the next decision.`, "Build stronger evidence"],
+    ["Promote", `Turn ${topic} into a repeatable advantage`, `Move from scattered effort to ${outcome} with a workflow the whole team can follow.`, `Build your ${asset}`],
+    ["Story", `This one small change prevented a painful revision cycle`, `Earlier feedback gives the team room to solve problems before time and options disappear.`, "Catch problems earlier"],
+    ["Educate", `Not every decision should be automated. That matters.`, `Automate repeatable checks, then make the moments that require human judgment impossible to miss.`, "Balance speed and judgment"],
+    ["Promote", `${product} explains the next step, not just the problem`, `Practical guidance helps ${audience} move from finding to finished work faster.`, "See clearer recommendations"],
+    ["Story", `Our process stopped living in five different tools`, `A shared ${asset} keeps priorities, owners, and open questions from getting lost.`, "Simplify the workflow"],
+    ["Educate", `How to make feedback actually actionable`, `Name the issue, explain the impact, show the next step, and assign an owner.`, "Use the action-first format"],
+    ["Promote", `Get to ${outcome} with fewer surprises`, `${product} helps teams spot ${risk} and organize the work before it becomes urgent.`, "Start a private project"],
+    ["Story", `The best final meeting we had was the shortest one`, `${proof} made the decision easy to explain, approve, and act on.`, "Prepare a cleaner handoff"],
+    ["Educate", `A better result starts before the final version`, `Move ${topic} upstream so improvements are faster, easier, and less expensive to make.`, "Move the work upstream"],
+    ["Promote", `Your next project deserves a real preflight`, `Replace last-minute guesswork with ${proof} and a clear path to ${outcome}.`, "Preflight your next project"],
+    ["Story", `We found the pattern when we finally saw the whole process`, `A complete view reveals repeat problems the team can fix once and prevent next time.`, "Find the recurring problem"],
+    ["Educate", `The four questions every strong workflow answers`, `What happened? What changed? What remains? Who owns the next step?`, "Save these four questions"],
+    ["Promote", `${product} keeps the team focused on what matters`, `Prioritized next steps help ${audience} act on meaningful work instead of drowning in noise.`, "Focus your next project"],
+    ["Story", `From scattered effort to one confident decision`, `A structured ${topic} gives every stakeholder the same facts and the same next steps.`, "Align the whole team"],
+    ["Educate", `How to create a repeatable quality gate`, `Define the checks, set the threshold, record the evidence, and keep human review visible.`, "Build your quality gate"],
+    ["Promote", `Know before you ship`, `${product} helps ${audience} turn ${topic} into ${outcome}.`, `Try ${product} privately`]
+  ];
+  return ideas.map(([format, hook, body, cta], index) => ({
     day: index + 1,
-    format: types[index % 3],
-    hook: hooks[index % hooks.length],
-    body: `${product} helps ${audience} ${result.charAt(0).toLowerCase()}${result.slice(1).replace(/\.$/, "")}.`,
-    cta: `Try ${product} today`
+    format, hook: clean(hook, 150), body: clean(body, 170), cta: clean(cta, 42)
   }));
 }
 
 async function ollamaIdeas(input) {
   if (!OLLAMA_MODEL) return null;
-  const prompt = `Create exactly 30 short-form video ideas as JSON array. Each object needs day, format (Story, Educate, or Promote), hook, body, cta. Product: ${clean(input.product, 80)}. Audience: ${clean(input.audience, 120)}. Description: ${clean(input.description, 240)}. Goal: ${clean(input.goal, 80)}. Return JSON only.`;
+  const prompt = `Create exactly 30 distinct short-form video ideas as a JSON array. Each object needs day, format (Story, Educate, or Promote), hook, body, and cta. Every body must be unique, directly continue its hook, include naturally relevant search keywords, deliver one useful insight, and stay under 145 characters. Every CTA must be unique, specific to the idea, and under 34 characters. Never repeat a generic product-description sentence. Product: ${clean(input.product, 80)}. Audience: ${clean(input.audience, 120)}. Description: ${clean(input.description, 240)}. Goal: ${clean(input.goal, 80)}. Return JSON only.`;
   const response = await fetch(`${OLLAMA_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -176,10 +242,23 @@ async function ollamaIdeas(input) {
   const result = await response.json();
   const parsed = JSON.parse(result.response);
   const ideas = Array.isArray(parsed) ? parsed : parsed.ideas;
-  return ideas.slice(0, 30).map((idea, index) => ({
+  if (!Array.isArray(ideas)) return null;
+  const generated = ideas.slice(0, 30).map((idea, index) => ({
     day: index + 1, format: ["Story", "Educate", "Promote"].includes(idea.format) ? idea.format : "Story",
-    hook: clean(idea.hook, 180), body: clean(idea.body, 300), cta: clean(idea.cta, 100)
+    hook: clean(idea.hook, 150), body: clean(idea.body, 170), cta: clean(idea.cta, 42)
   }));
+  const fallback = localIdeas(input);
+  const usedHooks = new Set();
+  const usedBodies = new Set();
+  const usedCtas = new Set();
+  return fallback.map((backup, index) => {
+    const candidate = generated[index];
+    const valid = candidate && candidate.hook && candidate.body && candidate.cta &&
+      !usedHooks.has(candidate.hook) && !usedBodies.has(candidate.body) && !usedCtas.has(candidate.cta);
+    const idea = valid ? candidate : backup;
+    usedHooks.add(idea.hook); usedBodies.add(idea.body); usedCtas.add(idea.cta);
+    return { ...idea, day: index + 1 };
+  });
 }
 
 async function api(req, res, url) {
@@ -193,7 +272,7 @@ async function api(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/health") {
-    return send(res, 200, { ok: true, ai: OLLAMA_MODEL ? "ollama" : "offline", version: "1.0.0" });
+    return send(res, 200, { ok: true, ai: OLLAMA_MODEL ? "ollama" : "offline", version: VERSION });
   }
   if (req.method === "GET" && url.pathname === "/api/me") {
     const user = currentUser(req);
