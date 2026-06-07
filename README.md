@@ -38,6 +38,7 @@ a useful production loop without introducing another monthly bill:
 | Uploaded image and video backgrounds | ✅ |
 | Recorded/uploaded voiceovers embedded in exports | ✅ |
 | Browser-rendered 9:16 WebM video | ✅ |
+| Persistent light and dark themes | ✅ |
 | SRT captions, posting packs, and device sharing | ✅ |
 | Installable PWA and offline core interface | ✅ |
 | Docker deployment, rate limiting, and security headers | ✅ |

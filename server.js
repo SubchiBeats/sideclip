@@ -20,7 +20,7 @@ const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "";
 
 const staticFiles = new Set([
   "/", "/index.html", "/styles.css", "/app.js", "/manifest.webmanifest",
-  "/sw.js", "/icon.svg", "/privacy.html"
+  "/theme.js", "/sw.js", "/icon.svg", "/privacy.html"
 ]);
 const mimeTypes = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",

@@ -8,6 +8,7 @@ const path = require("node:path");
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
+const theme = fs.readFileSync(path.join(root, "theme.js"), "utf8");
 
 test("HTML ids are unique", () => {
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
@@ -28,4 +29,12 @@ test("video renderer fits supporting copy and centers CTA text", () => {
   assert.doesNotMatch(app, /visible\[maxLines - 1\].*…/);
   assert.match(app, /Publish readiness/);
   assert.match(app, /planNeedsUpgrade/);
+});
+
+test("theme toggle is persistent and hero copy uses readable panels", () => {
+  assert.match(html, /id="themeToggle"/);
+  assert.match(html, /mini-copy/);
+  assert.match(theme, /sideclip-theme/);
+  assert.match(theme, /prefers-color-scheme: dark/);
+  assert.match(fs.readFileSync(path.join(root, "styles.css"), "utf8"), /\[data-theme="dark"\]/);
 });

@@ -7,6 +7,7 @@
   <title>SideClip - Turn one idea into a month of short-form video</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -20,7 +21,10 @@
       <a href="#formats">Formats</a>
       <a href="#studio">Studio</a>
     </nav>
-    <button class="button button-dark button-small" id="accountButton" type="button">Sign in <span>↗</span></button>
+    <div class="header-controls">
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon">☾</span><span class="theme-label">Dark</span></button>
+      <button class="button button-dark button-small" id="accountButton" type="button">Sign in <span>↗</span></button>
+    </div>
   </header>
 
   <main id="top">
@@ -44,14 +48,14 @@
         <div class="phone-card phone-back">
           <div class="mini-video mini-coral">
             <span class="mini-pill">PROMO</span>
-            <strong>Wait.<br>You still do<br>this manually?</strong>
+            <div class="mini-copy mini-copy-coral"><small>WORK SMARTER</small><strong>Still making every clip manually?</strong></div>
           </div>
         </div>
         <div class="phone-card phone-main">
           <div class="mini-video mini-dark">
             <span class="mini-pill">STORY</span>
             <div class="face-art"><span></span><span></span></div>
-            <strong>Your next<br>great idea<br>needs a hook.</strong>
+            <div class="mini-copy"><small>STOP THE SCROLL</small><strong>Your next great idea needs a hook.</strong></div>
             <small>sideclip.app</small>
           </div>
         </div>
