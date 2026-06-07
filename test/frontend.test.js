@@ -25,4 +25,7 @@ test("video renderer fits supporting copy and centers CTA text", () => {
   assert.match(app, /fitSingleLine/);
   assert.match(app, /ctx\.textAlign = "center"/);
   assert.doesNotMatch(app, /wrapText\(ctx, body, 300\)\.slice\(0, 3\)/);
+  assert.doesNotMatch(app, /visible\[maxLines - 1\].*…/);
+  assert.match(app, /Publish readiness/);
+  assert.match(app, /planNeedsUpgrade/);
 });

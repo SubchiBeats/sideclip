@@ -193,7 +193,7 @@
           <section class="studio-view" id="calendarView">
             <div class="view-header">
               <div><span>YOUR CONTENT PLAN</span><h3>Thirty reasons to post.</h3></div>
-              <button class="ghost-button" id="newBrief">Edit brief</button>
+              <div class="header-actions"><button class="ghost-button" id="regeneratePlan">Regenerate stronger plan</button><button class="ghost-button" id="newBrief">Edit brief</button></div>
             </div>
             <div class="filter-row">
               <button class="filter active" data-filter="All">All <span>30</span></button>
@@ -217,10 +217,11 @@
               </div>
               <form class="editor-controls" id="editorForm">
                 <label class="field"><span>Format</span><select id="editFormat"><option>Story</option><option>Educate</option><option>Promote</option></select></label>
-                <label class="field"><span>Hook</span><textarea id="editHook"></textarea></label>
-                <label class="field"><span>Supporting line</span><textarea id="editBody"></textarea></label>
-                <label class="field"><span>Call to action</span><input id="editCta" value="Try it today →"></label>
+                <label class="field copy-field"><span>Hook <small id="hookCount">0 / 105</small></span><textarea id="editHook" maxlength="105"></textarea></label>
+                <label class="field copy-field"><span>Supporting line <small id="bodyCount">0 / 145</small></span><textarea id="editBody" maxlength="145"></textarea></label>
+                <label class="field copy-field"><span>Call to action <small id="ctaCount">0 / 34</small></span><input id="editCta" maxlength="34" value="See how it works"></label>
                 <label class="field"><span>Accent color</span><input id="editColor" type="color" value="#d7ff39"></label>
+                <div class="quality-panel" id="qualityPanel"><b id="qualityScore">Publish readiness: 100</b><p id="qualityIssues">Relevant, concise, and ready to render.</p></div>
                 <label class="field"><span>Background media</span><select id="editAsset"><option value="">Procedural animation</option></select></label>
                 <label class="field"><span>Exported voiceover</span><select id="voiceAsset"><option value="">No audio track</option></select></label>
                 <label class="field"><span>Narration voice</span><select id="voiceSelect"><option value="">System default</option></select></label>

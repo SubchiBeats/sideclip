@@ -6,7 +6,7 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { localIdeas, hashPassword, verifyPassword } = require("../server");
+const { localIdeas, ideaQuality, hashPassword, verifyPassword } = require("../server");
 
 test("offline generator returns thirty structured ideas", () => {
   const ideas = localIdeas({ product: "SideClip", audience: "creators", description: "ship video faster" });
@@ -16,8 +16,9 @@ test("offline generator returns thirty structured ideas", () => {
   assert.equal(new Set(ideas.map(idea => idea.hook)).size, 30);
   assert.equal(new Set(ideas.map(idea => idea.body)).size, 30);
   assert.equal(new Set(ideas.map(idea => idea.cta)).size, 30);
-  assert.ok(ideas.every(idea => idea.body.length <= 170));
-  assert.ok(ideas.every(idea => idea.cta.length <= 42));
+  assert.ok(ideas.every(idea => idea.body.length <= 145));
+  assert.ok(ideas.every(idea => idea.cta.length <= 34));
+  assert.ok(ideas.every(idea => ideaQuality(idea, { product: "SideClip", description: "ship video faster" }).score === 100));
 });
 
 test("offline supporting copy stays concise for long campaign briefs", () => {
@@ -27,10 +28,14 @@ test("offline supporting copy stays concise for long campaign briefs", () => {
     description: "Scan mixed-format communications deliverables for common Section 508 and WCAG accessibility risks, explain fixes in plain English, organize remediation, and generate client-ready evidence packs before content is published or delivered."
   });
   assert.equal(new Set(ideas.map(idea => idea.body)).size, 30);
-  assert.ok(ideas.every(idea => idea.body.length <= 170));
+  assert.ok(ideas.every(idea => idea.body.length <= 145));
   assert.ok(ideas.every(idea => !idea.body.endsWith(" scan")));
   assert.match(ideas.map(idea => idea.body).join(" "), /preflight|review|delivery|evidence/i);
   assert.match(ideas[0].body, /accessibility preflight/i);
+  assert.ok(ideas.every(idea => ideaQuality(idea, {
+    product: "AccessReady",
+    description: "Scan mixed-format communications deliverables for common Section 508 and WCAG accessibility risks, explain fixes in plain English, organize remediation, and generate client-ready evidence packs before content is published or delivered."
+  }).score === 100));
 });
 
 test("password hashes are salted and verifiable", async () => {
@@ -42,7 +47,7 @@ test("password hashes are salted and verifiable", async () => {
 });
 
 test("account and project API lifecycle", async t => {
-  const port = 43179;
+  const port = 43000 + process.pid % 1000;
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "sideclip-test-"));
   const child = spawn(process.execPath, ["server.js"], {
     cwd: path.join(__dirname, ".."),

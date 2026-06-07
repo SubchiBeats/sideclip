@@ -33,6 +33,7 @@ a useful production loop without introducing another monthly bill:
 | Secure local accounts with salted `scrypt` hashes | ✅ |
 | Persistent private projects and media library | ✅ |
 | Built-in zero-cost content planning engine | ✅ |
+| Product-specific hook angles and publish-readiness checks | ✅ |
 | Optional private AI through local Ollama | ✅ |
 | Uploaded image and video backgrounds | ✅ |
 | Recorded/uploaded voiceovers embedded in exports | ✅ |
@@ -107,7 +108,8 @@ npm test
 
 Tests cover frontend contracts, offline generation, salted password
 verification, authentication, project persistence, private uploads,
-cross-origin write protection, data export, and account deletion.
+cross-origin write protection, data export, account deletion, unique post
+copy, hook relevance, and non-truncating video layout.
 
 ## Production deployment
 

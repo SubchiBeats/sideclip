@@ -57,7 +57,7 @@ const templates = {
     "3 mistakes keeping {audience} stuck",
     "The 10-minute rule that changes your whole week",
     "Why your current system keeps failing you",
-    "Try this before you add another task",
+    "Before your next deadline, fix this hidden workflow gap",
     "The difference between a plan and a wish",
     "How to protect your best two hours",
     "A simple framework for {result}",
@@ -78,6 +78,30 @@ const templates = {
     "You bring the ambition. {product} brings the plan."
   ]
 };
+const vagueHookPattern = /^(try this|do this|stop scrolling|you need this|this changes everything|wait for it|the secret|one simple trick|before you add another task)/i;
+
+function copyQuality(idea) {
+  const hook = String(idea.hook || "").trim();
+  const body = String(idea.body || "").trim();
+  const cta = String(idea.cta || "").trim();
+  const descriptionWords = $("#description").value.toLowerCase().match(/[a-z0-9]{5,}/g) || [];
+  const product = $("#product").value.toLowerCase();
+  const relevant = product && `${hook} ${body}`.toLowerCase().includes(product) ||
+    descriptionWords.some(word => `${hook} ${body}`.toLowerCase().includes(word));
+  const issues = [];
+  if (vagueHookPattern.test(hook)) issues.push("Replace the vague hook with a specific pain, result, or product insight.");
+  if (!relevant) issues.push("Connect the hook or supporting line more clearly to the product.");
+  if (hook.length < 18 || hook.length > 105) issues.push("Keep the hook between 18 and 105 characters.");
+  if (body.length < 45 || body.length > 145) issues.push("Keep the supporting line between 45 and 145 characters.");
+  if (cta.length < 8 || cta.length > 34) issues.push("Keep the call to action between 8 and 34 characters.");
+  return { score: Math.max(0, 100 - issues.length * 25), issues };
+}
+
+function planNeedsUpgrade(plan) {
+  if (!Array.isArray(plan) || plan.length !== 30) return true;
+  if (new Set(plan.map(idea => idea.body)).size !== plan.length) return true;
+  return plan.some(idea => copyQuality(idea).score < 75);
+}
 
 function showView(name) {
   $$(".studio-view").forEach(v => v.classList.remove("active"));
@@ -190,6 +214,7 @@ function openEditor(item) {
   $("#editBody").value = state.current.body;
   $("#editCta").value = state.current.cta;
   $("#editColor").value = state.current.color;
+  updateQualityUi();
   updatePreview();
   showView("editor");
 }
@@ -203,9 +228,21 @@ function openEditor(item) {
       cta: $("#editCta").value,
       color: $("#editColor").value
     };
+    updateQualityUi();
     updatePreview();
   });
 });
+
+function updateQualityUi() {
+  const quality = copyQuality(state.current);
+  $("#hookCount").textContent = `${state.current.hook.length} / 105`;
+  $("#bodyCount").textContent = `${state.current.body.length} / 145`;
+  $("#ctaCount").textContent = `${state.current.cta.length} / 34`;
+  $("#qualityScore").textContent = `Publish readiness: ${quality.score}`;
+  $("#qualityIssues").textContent = quality.issues.length ? quality.issues.join(" ") : "Specific, relevant, concise, and ready to render.";
+  $("#qualityPanel").classList.toggle("warning", quality.issues.length > 0);
+  $("#renderButton").disabled = quality.issues.length > 0;
+}
 
 const canvas = $("#previewCanvas");
 const ctx = canvas.getContext("2d");
@@ -217,7 +254,19 @@ function roundedRect(context, x, y, w, h, r) {
 }
 
 function wrapText(context, text, maxWidth) {
-  const words = text.split(" ");
+  const words = text.split(" ").flatMap(word => {
+    if (context.measureText(word).width <= maxWidth) return [word];
+    const chunks = [];
+    let chunk = "";
+    for (const character of word) {
+      if (context.measureText(chunk + character).width > maxWidth && chunk) {
+        chunks.push(chunk);
+        chunk = character;
+      } else chunk += character;
+    }
+    if (chunk) chunks.push(chunk);
+    return chunks;
+  });
   const lines = [];
   let line = "";
   words.forEach(word => {
@@ -242,13 +291,7 @@ function fitTextBlock(context, text, maxWidth, maxLines, startSize, minSize, wei
   }
   context.font = `${weight} ${minSize}px Manrope`;
   lines = wrapText(context, text, maxWidth);
-  const visible = lines.slice(0, maxLines);
-  if (lines.length > maxLines) {
-    let last = visible[maxLines - 1];
-    while (last && context.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1).trim();
-    visible[maxLines - 1] = `${last}…`;
-  }
-  return { lines: visible, size: minSize };
+  return { lines, size: minSize, fits: lines.length <= maxLines };
 }
 
 function drawTextBlock(context, block, x, y, lineHeight, color) {
@@ -271,6 +314,9 @@ function fitSingleLine(context, text, maxWidth, startSize, minSize, weight = 800
 
 function drawFrame(progress = 0) {
   const { format, hook, body, cta, color } = state.current;
+  const quality = copyQuality(state.current);
+  const bodyFits = !quality.issues.some(issue => issue.startsWith("Keep the supporting line"));
+  const renderBody = bodyFits ? body : "Supporting line is too long. Shorten it to 145 characters before rendering.";
   ctx.fillStyle = "#11110f";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (state.assetElement) {
@@ -308,7 +354,7 @@ function drawFrame(progress = 0) {
   ctx.textBaseline = "alphabetic";
   ctx.fillText(format.toUpperCase(), 40, 41);
 
-  const hookBlock = fitTextBlock(ctx, hook, 310, 4, 36, 27, 800);
+  const hookBlock = fitTextBlock(ctx, hook, 310, 5, 36, 20, 800);
   const hookLineHeight = Math.round(hookBlock.size * 1.08);
   const hookHeight = hookBlock.lines.length * hookLineHeight;
   const hookY = Math.max(250, 405 - hookHeight);
@@ -327,8 +373,8 @@ function drawFrame(progress = 0) {
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.fillText("WHY IT MATTERS", 32, 446);
-  const bodyBlock = fitTextBlock(ctx, body, 296, 4, 14, 11, 600);
-  drawTextBlock(ctx, bodyBlock, 32, 466, Math.round(bodyBlock.size * 1.28), "#f2efe5");
+  const bodyBlock = fitTextBlock(ctx, renderBody, 296, 6, 14, 9, 600);
+  drawTextBlock(ctx, bodyBlock, 32, 466, Math.round(bodyBlock.size * 1.28), bodyFits ? "#f2efe5" : "#ff927f");
   ctx.globalAlpha = 1;
 
   ctx.shadowColor = "#00000066";
@@ -432,6 +478,7 @@ async function loadSession() {
     const result = await api("/api/me");
     state.user = result.user;
     $("#engineLabel").textContent = result.ai === "ollama" ? "LOCAL AI ACTIVE" : "OFFLINE ENGINE";
+    $("#engineDescription").textContent = `${result.ai === "ollama" ? "Private Ollama generation" : "Quality-gated local generation"} · v${result.version || "1.2.0"}`;
     updateAccountUi();
     if (state.user) await Promise.all([loadProjects(), loadAssets()]);
   } catch { toast("SideClip server is unavailable. Guest mode is active."); }
@@ -524,17 +571,25 @@ async function saveProject() {
   toast("Project saved.");
   await loadProjects();
 }
-function loadProject(projectId) {
+async function loadProject(projectId) {
   const project = state.projects.find(item => item.id === projectId);
   if (!project) return;
   state.projectId = project.id;
   const data = project.data;
   Object.entries(data.brief || {}).forEach(([key, value]) => { const input = $(`#${key}`); if (input) input.value = value; });
   state.plan = data.plan || [];
+  let upgraded = false;
+  if (planNeedsUpgrade(state.plan)) {
+    await generatePlan();
+    state.projectId = project.id;
+    upgraded = true;
+    toast("This older plan was upgraded with stronger, publish-ready copy.");
+  }
   state.voiceAsset = data.voiceAsset || null;
   $("#planCount").textContent = state.plan.length;
   renderPlan();
-  if (data.current) openEditor(data.current);
+  if (upgraded) openEditor(state.plan[0]);
+  else if (data.current) openEditor(data.current);
   if (data.selectedAsset) selectAsset(data.selectedAsset);
   toast("Project opened.");
 }
@@ -546,6 +601,12 @@ async function deleteProject(projectId) {
 }
 $("#saveProjectButton").addEventListener("click", saveProject);
 $("#refreshProjects").addEventListener("click", loadProjects);
+$("#regeneratePlan").addEventListener("click", async () => {
+  await generatePlan();
+  state.projectId = null;
+  showView("calendar");
+  toast("Generated a fresh plan with product-specific hooks.");
+});
 
 function escapeHtml(value) {
   const div = document.createElement("div");

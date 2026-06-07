@@ -70,6 +70,12 @@ function send(res, status, body, headers = {}) {
 
 function id() { return crypto.randomBytes(16).toString("hex"); }
 function clean(value, max = 5000) { return String(value || "").trim().slice(0, max); }
+function cleanWords(value, max) {
+  const text = String(value || "").trim();
+  if (text.length <= max) return text;
+  const clipped = text.slice(0, max + 1);
+  return clipped.slice(0, clipped.lastIndexOf(" ")).replace(/[,:;.!?-]+$/, "") + ".";
+}
 function safeUser(user) { return { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt }; }
 function cookies(req) {
   return Object.fromEntries((req.headers.cookie || "").split(";").filter(Boolean).map(part => {
@@ -138,6 +144,30 @@ async function saveDb() {
   return writeQueue;
 }
 
+const vagueHookPattern = /^(try this|do this|stop scrolling|you need this|this changes everything|wait for it|the secret|one simple trick|before you add another task)/i;
+
+function ideaQuality(idea, input = {}) {
+  const hook = clean(idea.hook, 500);
+  const body = clean(idea.body, 500);
+  const cta = clean(idea.cta, 500);
+  const product = clean(input.product, 80).toLowerCase();
+  const descriptionWords = clean(input.description, 240).toLowerCase().match(/[a-z0-9]{5,}/g) || [];
+  const hookRelevant = product && hook.toLowerCase().includes(product) ||
+    descriptionWords.some(word => hook.toLowerCase().includes(word));
+  const bodyRelevant = product && body.toLowerCase().includes(product) ||
+    descriptionWords.some(word => body.toLowerCase().includes(word));
+  const hasAngle = /\d|pov|why|how|before|after|mistake|warning|what if|we |our |the day|difference|stop|finally|fewer|without|vs|versus|meet|turn|get to|know|one |cannot|not just|from .+ to |\?/i.test(hook);
+  const issues = [];
+  if (vagueHookPattern.test(hook)) issues.push("Hook is too vague.");
+  if (!hookRelevant) issues.push("Hook needs a clearer product connection.");
+  if (!bodyRelevant) issues.push("Supporting line needs a clearer product connection.");
+  if (!hasAngle) issues.push("Hook needs a clearer curiosity, value, proof, or pain angle.");
+  if (hook.length < 18 || hook.length > 105) issues.push("Hook must be 18–105 characters.");
+  if (body.length < 45 || body.length > 145) issues.push("Supporting line must be 45–145 characters.");
+  if (cta.length < 8 || cta.length > 34) issues.push("Call to action must be 8–34 characters.");
+  return { score: Math.max(0, 100 - issues.length * 25), issues };
+}
+
 function localIdeas(input) {
   const product = clean(input.product, 80) || "Your product";
   const rawAudience = clean(input.audience, 120) || "busy teams";
@@ -185,48 +215,59 @@ function localIdeas(input) {
     }]
   ];
   const profile = (profiles.find(([pattern]) => pattern.test(sentence)) || [null, {
-    topic: fallbackTopic || "a better workflow", pain: "slow, fragmented work",
+    topic: `${product} workflow`, pain: `the slow way to ${fallbackTopic || "get results"}`,
     outcome: "a faster, clearer result", action: sentence.split(/,| and /i)[0].toLowerCase(),
     proof: "clear next steps and measurable progress", asset: "repeatable workflow",
     risk: "avoidable delays and missed details"
   }])[1];
   const { topic, pain, outcome, action, proof, asset, risk } = profile;
+  const topicArticle = /^[aeiou]/i.test(topic) ? "an" : "a";
   const ideas = [
-    ["Story", `POV: ${audience} finally leave ${pain} behind`, `A consistent ${topic} turns stressful last-minute work into ${outcome}.`, "See the better workflow"],
+    ["Story", `POV: ${audience} finally make ${topic} feel manageable`, `A consistent ${topic} turns stressful last-minute work into ${outcome}.`, "See the better workflow"],
     ["Educate", `3 warning signs ${risk} are slowing you down`, `Catch the pattern early, prioritize the highest-impact fix, and protect the final result.`, "Save this quick checklist"],
     ["Promote", `Meet ${product}: a smarter way to ${action}`, `${product} turns complex work into ${proof}.`, `Explore ${product}`],
-    ["Story", `The deadline was tomorrow. Then we found the problem.`, `Building ${topic} into the process creates time to fix issues before they become emergencies.`, "Fix it before the deadline"],
+    ["Story", `We found ${topicArticle} ${topic} problem the day before delivery`, `Building ${topic} into the process creates time to fix issues before they become emergencies.`, "Fix it before the deadline"],
     ["Educate", `The simplest way to improve your ${topic}`, `Start with one repeatable check, document the result, then act on the clearest next step.`, "Try the three-step method"],
     ["Promote", `What if ${outcome} felt routine?`, `${product} helps ${audience} ${action} without adding another complicated system.`, "See how it works"],
     ["Story", `We stopped treating ${topic} like a final-minute task`, `Moving the work earlier created fewer surprises and a much clearer path to ${outcome}.`, "Build a calmer process"],
-    ["Educate", `Do this before you call the work finished`, `Confirm the outcome, record the evidence, and keep the decisions that need human judgment visible.`, "Use this before delivery"],
-    ["Promote", `${product} was built for ${audience}`, `Get ${proof} in one focused workflow designed around the work you actually need to ship.`, "See what is included"],
+    ["Educate", `Before you finish your ${topic}, check these three things`, `For ${topic}, confirm the outcome, record the evidence, and keep human-review decisions visible.`, "Use this before delivery"],
+    ["Promote", `Why ${audience} use ${product} before the final handoff`, `Get ${proof} in one focused workflow designed around the work you actually need to ship.`, "See what is included"],
     ["Story", `A day in the life after solving ${pain}`, `Less chasing. Fewer surprises. More time focused on work that moves the project forward.`, "Make the day easier"],
-    ["Educate", `Why one task at a time can hide the bigger problem`, `A complete view reveals repeat patterns and gaps that isolated checks often miss.`, "Look at the whole workflow"],
-    ["Promote", `One workspace. Clearer next steps.`, `${product} brings scattered work into one practical ${asset}.`, "Create your action plan"],
-    ["Story", `They asked how we knew it was ready. We had the answer.`, `Clear evidence turns a vague promise into a confident, credible result everyone can understand.`, "Document the result"],
-    ["Educate", `The difference between doing the work and proving it`, `Strong workflows record the method, result, open questions, and owner of the next decision.`, "Build stronger evidence"],
+    ["Educate", `Why one-file ${topic} checks can hide the bigger problem`, `For ${topic}, a complete view reveals repeat patterns and gaps that isolated checks often miss.`, "Look at the whole workflow"],
+    ["Promote", `${product}: one workspace, every ${topic} next step`, `${product} brings scattered work into one practical ${asset}.`, "Create your action plan"],
+    ["Story", `They asked for proof of our ${topic}. We had it.`, `For ${topic}, clear evidence turns a vague promise into a credible result everyone can understand.`, "Document the result"],
+    ["Educate", `${topic}: the difference between checking and proving`, `Strong ${topic} workflows record the method, result, open questions, and owner of the next decision.`, "Build stronger evidence"],
     ["Promote", `Turn ${topic} into a repeatable advantage`, `Move from scattered effort to ${outcome} with a workflow the whole team can follow.`, `Build your ${asset}`],
-    ["Story", `This one small change prevented a painful revision cycle`, `Earlier feedback gives the team room to solve problems before time and options disappear.`, "Catch problems earlier"],
-    ["Educate", `Not every decision should be automated. That matters.`, `Automate repeatable checks, then make the moments that require human judgment impossible to miss.`, "Balance speed and judgment"],
+    ["Story", `One early ${topic} fix prevented a painful revision cycle`, `Earlier ${topic} feedback gives the team room to solve problems before time and options disappear.`, "Catch problems earlier"],
+    ["Educate", `${topic} automation cannot make every decision`, `Automate repeatable ${topic} checks, then make the moments requiring human judgment impossible to miss.`, "Balance speed and judgment"],
     ["Promote", `${product} explains the next step, not just the problem`, `Practical guidance helps ${audience} move from finding to finished work faster.`, "See clearer recommendations"],
-    ["Story", `Our process stopped living in five different tools`, `A shared ${asset} keeps priorities, owners, and open questions from getting lost.`, "Simplify the workflow"],
-    ["Educate", `How to make feedback actually actionable`, `Name the issue, explain the impact, show the next step, and assign an owner.`, "Use the action-first format"],
+    ["Story", `Our ${topic} process stopped living in five different tools`, `A shared ${asset} keeps ${topic} priorities, owners, and open questions from getting lost.`, "Simplify the workflow"],
+    ["Educate", `How to make ${topic} feedback actually actionable`, `For ${topic}, name the issue, explain the impact, show the next step, and assign an owner.`, "Use the action-first format"],
     ["Promote", `Get to ${outcome} with fewer surprises`, `${product} helps teams spot ${risk} and organize the work before it becomes urgent.`, "Start a private project"],
-    ["Story", `The best final meeting we had was the shortest one`, `${proof} made the decision easy to explain, approve, and act on.`, "Prepare a cleaner handoff"],
+    ["Story", `Our shortest ${topic} handoff was also our strongest`, `For ${topic}, ${proof} made the decision easy to explain, approve, and act on.`, "Prepare a cleaner handoff"],
     ["Educate", `A better result starts before the final version`, `Move ${topic} upstream so improvements are faster, easier, and less expensive to make.`, "Move the work upstream"],
     ["Promote", `Your next project deserves a real preflight`, `Replace last-minute guesswork with ${proof} and a clear path to ${outcome}.`, "Preflight your next project"],
-    ["Story", `We found the pattern when we finally saw the whole process`, `A complete view reveals repeat problems the team can fix once and prevent next time.`, "Find the recurring problem"],
-    ["Educate", `The four questions every strong workflow answers`, `What happened? What changed? What remains? Who owns the next step?`, "Save these four questions"],
-    ["Promote", `${product} keeps the team focused on what matters`, `Prioritized next steps help ${audience} act on meaningful work instead of drowning in noise.`, "Focus your next project"],
-    ["Story", `From scattered effort to one confident decision`, `A structured ${topic} gives every stakeholder the same facts and the same next steps.`, "Align the whole team"],
-    ["Educate", `How to create a repeatable quality gate`, `Define the checks, set the threshold, record the evidence, and keep human review visible.`, "Build your quality gate"],
+    ["Story", `We found the ${topic} pattern across the whole project`, `A complete ${topic} view reveals repeat problems the team can fix once and prevent next time.`, "Find the recurring problem"],
+    ["Educate", `Four questions every strong ${topic} workflow answers`, `For ${topic}: what happened, what changed, what remains, and who owns the next step?`, "Save these four questions"],
+    ["Promote", `Why ${product} prioritizes the ${topic} work that matters`, `Prioritized ${topic} steps help ${audience} act on meaningful work instead of drowning in noise.`, "Focus your next project"],
+    ["Story", `From scattered ${topic} feedback to one confident decision`, `A structured ${topic} gives every stakeholder the same facts and the same next steps.`, "Align the whole team"],
+    ["Educate", `How to create a repeatable ${topic} quality gate`, `For ${topic}, define the checks, set the threshold, record the evidence, and keep human review visible.`, "Build your quality gate"],
     ["Promote", `Know before you ship`, `${product} helps ${audience} turn ${topic} into ${outcome}.`, `Try ${product} privately`]
   ];
-  return ideas.map(([format, hook, body, cta], index) => ({
-    day: index + 1,
-    format, hook: clean(hook, 150), body: clean(body, 170), cta: clean(cta, 42)
-  }));
+  return ideas.map(([format, hook, body, cta], index) => {
+    let relevantHook = hook;
+    let relevantBody = body;
+    const draft = { hook, body, cta };
+    const draftIssues = ideaQuality(draft, input).issues;
+    if (draftIssues.some(issue => issue.startsWith("Hook needs a clearer product"))) {
+      relevantHook = `${topic}: ${hook}`;
+    }
+    if (draftIssues.some(issue => issue.startsWith("Supporting line needs"))) {
+      relevantBody = `For ${topic}, ${body.charAt(0).toLowerCase()}${body.slice(1)}`;
+    }
+    const item = { day: index + 1, format, hook: cleanWords(relevantHook, 105), body: cleanWords(relevantBody, 145), cta: cleanWords(cta, 34) };
+    return { ...item, quality: ideaQuality(item, input).score };
+  });
 }
 
 async function ollamaIdeas(input) {
@@ -245,7 +286,7 @@ async function ollamaIdeas(input) {
   if (!Array.isArray(ideas)) return null;
   const generated = ideas.slice(0, 30).map((idea, index) => ({
     day: index + 1, format: ["Story", "Educate", "Promote"].includes(idea.format) ? idea.format : "Story",
-    hook: clean(idea.hook, 150), body: clean(idea.body, 170), cta: clean(idea.cta, 42)
+    hook: clean(idea.hook, 105), body: clean(idea.body, 145), cta: clean(idea.cta, 34)
   }));
   const fallback = localIdeas(input);
   const usedHooks = new Set();
@@ -254,10 +295,11 @@ async function ollamaIdeas(input) {
   return fallback.map((backup, index) => {
     const candidate = generated[index];
     const valid = candidate && candidate.hook && candidate.body && candidate.cta &&
+      ideaQuality(candidate, input).score >= 75 &&
       !usedHooks.has(candidate.hook) && !usedBodies.has(candidate.body) && !usedCtas.has(candidate.cta);
     const idea = valid ? candidate : backup;
     usedHooks.add(idea.hook); usedBodies.add(idea.body); usedCtas.add(idea.cta);
-    return { ...idea, day: index + 1 };
+    return { ...idea, day: index + 1, quality: ideaQuality(idea, input).score };
   });
 }
 
@@ -276,7 +318,7 @@ async function api(req, res, url) {
   }
   if (req.method === "GET" && url.pathname === "/api/me") {
     const user = currentUser(req);
-    return send(res, 200, { user: user ? safeUser(user) : null, ai: OLLAMA_MODEL ? "ollama" : "offline" });
+    return send(res, 200, { user: user ? safeUser(user) : null, ai: OLLAMA_MODEL ? "ollama" : "offline", version: VERSION });
   }
   if (req.method === "POST" && url.pathname === "/api/register") {
     if (rateLimited(req, "auth", 8)) return send(res, 429, { error: "Too many attempts. Wait one minute." });
@@ -416,4 +458,4 @@ async function start() {
 }
 
 if (require.main === module) start();
-module.exports = { start, localIdeas, hashPassword, verifyPassword };
+module.exports = { start, localIdeas, ideaQuality, hashPassword, verifyPassword };
