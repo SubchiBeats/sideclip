@@ -73,8 +73,10 @@ function clean(value, max = 5000) { return String(value || "").trim().slice(0, m
 function cleanWords(value, max) {
   const text = String(value || "").trim();
   if (text.length <= max) return text;
-  const clipped = text.slice(0, max + 1);
-  return clipped.slice(0, clipped.lastIndexOf(" ")).replace(/[,:;.!?-]+$/, "") + ".";
+  const clipped = text.slice(0, max);
+  const boundary = clipped.lastIndexOf(" ");
+  const base = (boundary > 0 ? clipped.slice(0, boundary) : clipped).replace(/[,:;.!?-]+$/, "");
+  return `${base.slice(0, max - 1)}.`;
 }
 function safeUser(user) { return { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt }; }
 function cookies(req) {
@@ -164,7 +166,7 @@ function ideaQuality(idea, input = {}) {
     descriptionWords.some(word => hook.toLowerCase().includes(word));
   const bodyRelevant = product && body.toLowerCase().includes(product) ||
     descriptionWords.some(word => body.toLowerCase().includes(word));
-  const hasAngle = /\d|pov|why|how|before|after|mistake|warning|what if|we |our |the day|the tiny thing|the face|the daily|the moment|the sound|the household rule|a completely normal|what .+ says|review of today|could text|difference|stop|finally|fewer|without|vs|versus|meet|turn|get to|know|one |cannot|not just|from .+ to |\?/i.test(hook);
+  const hasAngle = /\d|pov|why|how|before|after|mistake|warning|what if|we |our |the day|the tiny thing|the small detail|the face|the daily|the moment|the sound|the household rule|the easiest|the best|a completely normal|a real result|ready for|what .+ says|review of today|could text|difference|stop|finally|fewer|without|vs|versus|meet|turn|get to|know|one |cannot|not just|from .+ to |\?/i.test(hook);
   const issues = [];
   if (vagueHookPattern.test(hook)) issues.push("Hook is too vague.");
   if (!hookRelevant) issues.push("Hook needs a clearer product connection.");
@@ -227,13 +229,163 @@ function petIdeas(input) {
   });
 }
 
+function tag(value) {
+  return `#${String(value || "").replace(/[^a-z0-9]/gi, "")}`.replace(/^#$/, "#SmallBusiness");
+}
+
+function marketIdeas(input, profile) {
+  const product = clean(input.product, 80) || "Your brand";
+  const rawAudience = clean(input.audience, 120) || profile.audience || "your audience";
+  const audience = rawAudience.split(/,| and | who /i)[0].trim() || profile.audience || "your audience";
+  const visualStyles = ["orbit", "checklist", "spotlight", "cards", "grid", "waves"];
+  const topic = profile.topic;
+  const benefit = profile.benefit;
+  const pain = profile.pain;
+  const outcome = profile.outcome;
+  const action = profile.action;
+  const proof = profile.proof;
+  const risk = profile.risk;
+  const moment = profile.moment;
+  const category = profile.category || topic;
+  const tags = `${tag(product)} ${tag(category)} ${tag(profile.seo || topic)} #LocalBusiness`;
+  const captionInsights = [
+    `Start with the situation ${audience} already recognize, then show the specific detail that makes ${product} different.`,
+    `A useful post earns attention by helping someone recognize a need before asking them to make a decision.`,
+    `Specific proof builds more trust than broad claims. Show what is included, who it helps, and what changes next.`,
+    `Good planning reduces friction. Give people one detail they can use before ${moment}.`,
+    `Name the frustration honestly, then explain the practical choice that makes the experience better.`,
+    `The best promotion feels useful first: teach one thing, make the value clear, and invite the next step.`,
+    `Small details make a brand memorable because they give people something concrete to picture and repeat.`,
+    `Questions turn passive viewers into prepared buyers. Help them compare fit, timing, and expectations.`,
+    `Trust grows when ${product} explains why the details matter instead of only saying the result is better.`,
+    `A timely reminder works when it connects the upcoming moment to one simple action people can take now.`,
+    `Price is only one part of value. Fit, reliability, communication, and the final experience matter too.`,
+    `${product} becomes easier to choose when the post clearly connects the offer to ${outcome}.`,
+    `Show the moment confidence replaces uncertainty. That emotional shift is often the real customer story.`,
+    `A strong fit post helps people rule themselves in or out without pressure, saving time on both sides.`,
+    `Transformation content works best when it clearly names the before, the after, and the bridge between them.`,
+    `Thoughtful service is visible in small decisions. Make one of those decisions the center of the story.`,
+    `Educational content should leave ${audience} better prepared even if they do not buy immediately.`,
+    `Reduce choice overload by showing the clearest path to the result instead of listing every possible feature.`,
+    `A believable customer journey starts with hesitation and ends with one practical next step.`,
+    `Prevention content is strongest when it names the risk and gives people a simple way to avoid it.`,
+    `Stress falls when expectations are clear. Explain what happens first, what is included, and what comes next.`,
+    `Memorable experiences are easy to describe. Give people a detail they would naturally tell a friend.`,
+    `Simple plans work because they reduce decisions at the moment people are already busy or uncertain.`,
+    `Clear positioning tells ${audience} why ${product} fits their situation better than a generic alternative.`,
+    `Intentional choices create stronger outcomes than last-minute guesses. Show the reason behind the choice.`,
+    `Checklists perform well because they turn a vague decision into useful, saveable steps.`,
+    `Timely promotion should answer why now, why this offer, and what someone gains by acting.`,
+    `The first step should feel small enough to take today and meaningful enough to create momentum.`,
+    `Confidence comes from comparing the right details, not from collecting more random options.`,
+    `A strong call to action continues the story by making the next step feel natural and specific.`
+  ];
+  const conciseBodies = [
+    `${product} makes ${topic} easier to understand and choose.`,
+    `${product} brings clear value and practical detail to ${topic}.`,
+    `${product} shows what thoughtful ${topic} can include.`,
+    `${product} gives people a clearer way to approach ${topic}.`,
+    `${product} replaces uncertainty with useful ${topic} details.`,
+    `${product} makes the value behind ${topic} easier to see.`,
+    `${product} focuses on the details that make ${topic} memorable.`,
+    `${product} helps people ask better questions about ${topic}.`,
+    `${product} makes a strong ${topic} choice feel more reliable.`,
+    `${product} helps people plan ${topic} with less last-minute stress.`,
+    `${product} explains what creates real value in ${topic}.`,
+    `${product} connects ${topic} to a result people actually want.`,
+    `${product} makes confidence part of the ${topic} experience.`,
+    `${product} helps people decide whether ${topic} truly fits.`,
+    `${product} creates a clearer path from the problem to ${outcome}.`,
+    `${product} uses thoughtful details to improve the whole experience.`,
+    `${product} gives people useful context before choosing ${topic}.`,
+    `${product} makes the path to ${outcome} easier to follow.`,
+    `${product} turns hesitation into a clear and practical next step.`,
+    `${product} helps people avoid common mistakes around ${topic}.`,
+    `${product} creates clearer expectations around ${topic}.`,
+    `${product} makes ${topic} easier to remember and recommend.`,
+    `${product} gives people a simple way to prepare for ${moment}.`,
+    `${product} makes the reason to choose ${topic} easier to explain.`,
+    `${product} helps people choose ${topic} with more intention.`,
+    `${product} turns a vague ${topic} decision into four clear checks.`,
+    `${product} explains why now can be the right time for ${topic}.`,
+    `${product} makes the first step toward ${outcome} feel doable.`,
+    `${product} helps people compare ${topic} using the details that matter.`,
+    `${product} makes the next step toward ${outcome} clear and specific.`
+  ];
+  const templates = [
+    ["Story", `POV: ${audience} discover ${topic} chosen with care`, `${product} helps ${audience} move from ${pain} to ${outcome}.`, `Explore ${product}`],
+    ["Educate", `3 signs it is time to try ${product}`, `${product} gives ${audience} ${benefit} without the usual uncertainty.`, "Save these three signs"],
+    ["Promote", `Meet ${product}: ${benefit}`, `${product} combines ${proof} for ${audience}.`, `Choose ${product}`],
+    ["Story", `Before ${moment}, consider ${product}`, `${product} turns ${topic} into a clearer decision for ${audience}.`, "Plan it with confidence"],
+    ["Educate", `Why you should not settle for ${pain}`, `${product} makes ${topic} clearer with useful details and support people can trust.`, "Know what to look for"],
+    ["Promote", `How ${product} helps ${audience} ${action}`, `${product} offers ${benefit} around what matters most.`, "See how it works"],
+    ["Story", `The small detail people remember about ${topic}`, `${product} focuses on the details ${audience} notice first and remember later.`, "Notice the difference"],
+    ["Educate", `Before you book ${topic}, ask these three questions`, `The right questions help ${audience} avoid ${risk} and choose the option that actually fits.`, "Use these questions"],
+    ["Promote", `Why ${audience} choose ${product} when details matter`, `${product} combines ${proof} so the decision feels less rushed and more reliable.`, "Start your plan"],
+    ["Story", `Why planning ${moment} earlier feels better`, `${product} gives ${audience} a calmer way to plan, compare, and choose.`, "Start earlier"],
+    ["Educate", `The difference between cheap and truly valuable ${topic}`, `Value comes from fit, trust, timing, and the details that prevent disappointment later.`, "Compare the right way"],
+    ["Promote", `How ${product} makes ${outcome} simpler`, `${product} helps ${audience} skip the guesswork and focus on the result they actually want.`, "Get the better result"],
+    ["Story", `How ${product} helps ${audience} know they chose well`, `${product} creates confidence with ${proof}.`, "Look for this moment"],
+    ["Educate", `How to tell if ${topic} is the right fit`, `Look for clear communication, proof of care, and a result that matches your real situation.`, "Check the fit first"],
+    ["Promote", `Turn ${pain} into ${outcome}`, `${product} makes ${action} feel less overwhelming and more doable for ${audience}.`, "Make it easier"],
+    ["Story", `One thoughtful detail can change the whole experience`, `${product} uses small, intentional choices to make ${topic} feel more personal and less generic.`, "Lead with the detail"],
+    ["Educate", `What ${audience} should know before choosing ${topic}`, `The best choice solves the practical need and feels right for the moment, budget, and person.`, "Save this before choosing"],
+    ["Promote", `Why ${product} brings ${benefit} closer`, `${product} gives ${audience} a focused way to get the result without sorting through endless options.`, "Find your best option"],
+    ["Story", `From unsure to excited: the ${product} difference`, `${product} helps ${audience} replace hesitation with a clearer next step.`, "Take the next step"],
+    ["Educate", `How to avoid ${risk}`, `Start with the outcome, compare the details, and choose the option that can explain exactly what happens next.`, "Avoid the common mistake"],
+    ["Promote", `Get ${topic} without the usual stress`, `${product} helps ${audience} get ${outcome} with clearer expectations and fewer surprises.`, "Make it less stressful"],
+    ["Story", `Why people remember a great ${topic} experience`, `People remember how easy it felt, how well the details fit, and whether the result matched the promise.`, "Create a memorable moment"],
+    ["Educate", `The easiest way to make ${moment} feel smoother`, `Decide what matters most, choose support early, and keep the details simple enough to follow.`, "Use the simple plan"],
+    ["Promote", `Why ${product} makes the choice clearer for ${audience}`, `${product} pairs ${proof} with a direct path from interest to action.`, "Choose with clarity"],
+    ["Story", `The best ${topic} is rarely the most random choice`, `${product} helps ${audience} choose with intention instead of hoping the details work out.`, "Choose intentionally"],
+    ["Educate", `4 things to check before saying yes to ${topic}`, `Check the fit, timeline, proof, and communication before you commit.`, "Save the four checks"],
+    ["Promote", `Why ${product} is worth considering now`, `${product} helps ${audience} avoid ${pain} and move toward ${outcome}.`, "Consider it today"],
+    ["Story", `A real result starts with one clear ${product} decision`, `${product} gives ${audience} a practical first step toward ${outcome}.`, "Make the first decision"],
+    ["Educate", `How to choose ${topic} with more confidence`, `Compare the outcome, proof, process, and support instead of choosing from surface details alone.`, "Choose with confidence"],
+    ["Promote", `Ready for ${outcome}? Start with ${product}`, `${product} helps ${audience} ${action} with fewer doubts and a clearer reason to act.`, `Start with ${product}`]
+  ];
+  const promiseDetails = {
+    1: `Three signs ${product} may be the right fit:\n1. You want ${benefit}.\n2. You are tired of ${pain}.\n3. You want a choice that feels clear before you commit.`,
+    7: `Ask these three questions before booking:\n1. What exactly is included?\n2. What should happen next?\n3. How will the result match ${moment}?`,
+    25: `Four checks before saying yes:\n1. Fit: does it match the real need?\n2. Timeline: can it work for the moment?\n3. Proof: is the value clear?\n4. Communication: do you know what happens next?`
+  };
+  const usedBodies = new Set();
+  return templates.map(([format, hook, body, cta], index) => {
+    let cleanHook = cleanWords(hook, 105);
+    let bodyCandidate = body;
+    if (bodyCandidate.length > 145) bodyCandidate = conciseBodies[index];
+    if (bodyCandidate.length > 145) bodyCandidate = `${product} makes this choice clearer, more useful, and easier to understand.`;
+    let cleanBody = cleanWords(bodyCandidate, 145);
+    if (/\b(and|or|with|without|to|from|in|a|an|the|that|who|for)\.$/i.test(cleanHook)) {
+      cleanHook = cleanWords(`Why ${product} makes ${outcome} easier`, 105);
+    }
+    if (!cleanHook.toLowerCase().includes(product.toLowerCase()) && ideaQuality({ hook: cleanHook, body: cleanBody, cta }, input).issues.some(issue => issue.startsWith("Hook needs"))) {
+      cleanHook = cleanWords(`${product}: ${cleanHook}`, 105);
+    }
+    if (!cleanBody.toLowerCase().includes(product.toLowerCase()) && ideaQuality({ hook: cleanHook, body: cleanBody, cta }, input).issues.some(issue => issue.startsWith("Supporting line needs"))) {
+      cleanBody = cleanWords(`${product} helps ${audience} get ${outcome} with clear, practical support.`, 145);
+    }
+    if (/\b(and|or|with|without|to|from|in|a|an|the|that|who|for|usual|feels)\.$/i.test(cleanBody) || cleanBody.length < 45) {
+      cleanBody = cleanWords(`${product} helps ${audience} get ${outcome} with clear support and fewer surprises.`, 145);
+    }
+    if (/\b(and|or|with|without|to|from|in|a|an|the|that|who|for|usual|feels)\.$/i.test(cleanBody) || cleanBody.length > 145) {
+      cleanBody = conciseBodies[index].length <= 145 ? conciseBodies[index] : `${product} makes this choice clearer, more useful, and easier to understand.`;
+    }
+    if (usedBodies.has(cleanBody)) cleanBody = conciseBodies[index];
+    usedBodies.add(cleanBody);
+    const detail = promiseDetails[index] || `${cleanBody}\n\n${captionInsights[index]}`;
+    const caption = `${cleanHook}\n\n${detail}\n\n${cleanWords(cta, 34)}.\n\n${tags}`;
+    const item = { day: index + 1, format, hook: cleanHook, body: cleanBody, cta: cleanWords(cta, 34), caption, visual: visualStyles[index % visualStyles.length] };
+    return { ...item, quality: ideaQuality(item, input).score };
+  });
+}
+
 function localIdeas(input) {
   const product = clean(input.product, 80) || "Your product";
   const rawAudience = clean(input.audience, 120) || "busy teams";
   const audience = rawAudience.split(/,| and | who /i)[0].trim() || "busy teams";
   const description = clean(input.description, 240) || "get better results with less busywork";
   const sentence = description.replace(/[.!?]+$/, "");
-  if (/\b(dog|puppy|cat|kitten|pet)\b/i.test(sentence)) return petIdeas(input);
   const fallbackTopic = sentence
     .replace(/^(help|scan|create|build|make|plan|find|turn|organize|diagnose|generate)\s+/i, "")
     .split(/,| and | by | with | without /i)[0]
@@ -243,6 +395,180 @@ function localIdeas(input) {
     .join(" ")
     .toLowerCase();
   const profiles = [
+    [/bakery|cake|pastr|sourdough|bread/i, {
+      mode: "market", category: "Bakery", seo: "custom cakes", audience,
+      topic: "custom cakes and fresh pastries", pain: "last-minute dessert stress", outcome: "a celebration that feels personal and tastes fresh",
+      action: "order custom cakes, sourdough, and weekend pastries", benefit: "fresh flavors, thoughtful design, and local bakery care",
+      proof: "made-to-order cakes, seasonal pastries, and clear pickup details", risk: "generic cakes, flavor guesswork, and rushed pickup details", moment: "the birthday or weekend gathering"
+    }],
+    [/realtor|real estate|homebuyer|buy.*home|sell.*home/i, {
+      mode: "market", category: "Real Estate", seo: "first time homebuyer", audience,
+      topic: "first-home guidance", pain: "guessing through offers, inspections, and neighborhoods", outcome: "a clearer, more confident home purchase",
+      action: "find and buy a home with less uncertainty", benefit: "local guidance from search to closing",
+      proof: "neighborhood insight, offer strategy, and step-by-step buyer support", risk: "overpaying, missing red flags, and feeling rushed", moment: "the first home search"
+    }],
+    [/therap|anxiety|boundar|mental health|counsel/i, {
+      mode: "market", category: "Therapy", seo: "online therapy", audience,
+      topic: "online anxiety support", pain: "carrying anxiety alone after work", outcome: "calmer days and healthier boundaries",
+      action: "manage anxiety and build better boundaries", benefit: "private support and practical coping tools",
+      proof: "online sessions, simple exercises, and space to talk honestly", risk: "burnout, avoidance, and blurred boundaries", moment: "a stressful week"
+    }],
+    [/fitness|strength|coach|workout|gym|move better/i, {
+      mode: "market", category: "Fitness", seo: "strength coaching", audience,
+      topic: "beginner-friendly strength coaching", pain: "intimidating workouts and inconsistent routines", outcome: "stronger movement and more confidence",
+      action: "build strength safely and consistently", benefit: "small-group coaching, simple progressions, and supportive accountability",
+      proof: "coached form, realistic programming, and progress people can feel", risk: "doing too much too soon, poor form, and quitting early", moment: "the first month back in fitness"
+    }],
+    [/invoice|payment|bookkeep|accounting|freelance/i, {
+      mode: "market", category: "Invoicing", seo: "freelancer invoicing", audience,
+      topic: "freelancer invoicing", pain: "late payments and scattered invoice tracking", outcome: "faster payments and cleaner records",
+      action: "send invoices and track payments faster", benefit: "simple invoices, payment tracking, and fewer awkward follow-ups",
+      proof: "clear invoice status, organized client records, and fast reminders", risk: "missed invoices, unpaid work, and messy bookkeeping", moment: "the end of a client project"
+    }],
+    [/restaurant|pasta|dinner|date-night|cafe|coffee|food truck/i, {
+      mode: "market", category: "Restaurant", seo: "date night restaurant", audience,
+      topic: "a memorable date-night dinner", pain: "another forgettable dinner plan", outcome: "a cozy meal worth talking about",
+      action: "book a table for handmade food and a better night out", benefit: "handmade dishes, warm service, and a reason to slow down",
+      proof: "seasonal ingredients, thoughtful service, and a setting built for conversation", risk: "bland food, noisy rooms, and rushed service", moment: "date night"
+    }],
+    [/nonprofit|donat|underserved|free books|reading support/i, {
+      mode: "market", category: "Nonprofit", seo: "literacy nonprofit", audience,
+      topic: "children's reading support", pain: "kids missing books, confidence, and reading practice", outcome: "more children seeing reading as possible",
+      action: "support free books and reading help", benefit: "books, encouragement, and practical literacy support",
+      proof: "community partnerships, book access, and consistent reading support", risk: "low book access, falling confidence, and missed early support", moment: "a child's next reading milestone"
+    }],
+    [/skincare|skin|serum|moistur|fragrance-free|beauty/i, {
+      mode: "market", category: "Skincare", seo: "sensitive skin care", audience,
+      topic: "sensitive-skin skincare", pain: "trial-and-error routines that irritate skin", outcome: "a calmer daily routine",
+      action: "build a simple fragrance-free routine", benefit: "gentle formulas and fewer unnecessary steps",
+      proof: "fragrance-free products, clear ingredients, and routine-friendly guidance", risk: "irritation, product overload, and confusing ingredient claims", moment: "the morning skincare routine"
+    }],
+    [/plumb|drain|leak|water heater|home service|repair/i, {
+      mode: "market", category: "Plumbing", seo: "emergency plumber", audience,
+      topic: "fast plumbing help", pain: "leaks, clogs, and home repairs that cannot wait", outcome: "a safer, working home again",
+      action: "book drain cleaning, leak repair, or water heater service", benefit: "quick response and clear repair options",
+      proof: "emergency service, practical diagnostics, and straightforward next steps", risk: "water damage, repeat clogs, and surprise repair costs", moment: "a plumbing emergency"
+    }],
+    [/photograph|wedding|portrait|camera|engaged/i, {
+      mode: "market", category: "Photography", seo: "wedding photographer", audience,
+      topic: "candid wedding photography", pain: "stiff posing and photos that do not feel like you", outcome: "wedding photos with real emotion",
+      action: "capture candid, emotional moments", benefit: "natural direction and honest storytelling",
+      proof: "calm guidance, candid coverage, and attention to emotional details", risk: "awkward posing, missed moments, and photos that feel generic", moment: "the wedding day"
+    }],
+    [/spanish|language|course|lesson|speak confidently/i, {
+      mode: "market", category: "Language Learning", seo: "Spanish course", audience,
+      topic: "practical Spanish speaking", pain: "memorizing words but freezing in real conversations", outcome: "more confident travel and everyday conversations",
+      action: "practice Spanish for real-life situations", benefit: "simple lessons, useful phrases, and confidence-building practice",
+      proof: "travel scenarios, speaking practice, and everyday conversation prompts", risk: "unused vocabulary, embarrassment, and forgetting under pressure", moment: "the first real conversation"
+    }],
+    [/\bfestival\b|\bevent\b|\bconcert\b|music fans|local artists|vendors/i, {
+      mode: "market", category: "Events", seo: "community festival", audience,
+      topic: "a local community event", pain: "weekend plans that feel repetitive", outcome: "a fun day people can share together",
+      action: "bring friends or family to the event", benefit: "live music, local food, and activities for more than one age group",
+      proof: "local artists, food vendors, and family-friendly activities", risk: "missing the schedule, parking confusion, and not knowing what to bring", moment: "the festival weekend"
+    }],
+    [/artist|song|album|single|music|indie pop|band/i, {
+      mode: "market", category: "Music", seo: "new indie pop music", audience,
+      topic: "new indie pop music", pain: "songs that sound polished but do not feel personal", outcome: "a track listeners want to replay",
+      action: "listen to the new release", benefit: "dreamy hooks, honest lyrics, and a mood that sticks",
+      proof: "memorable melodies, emotional writing, and a clear visual world", risk: "generic promotion, weak story, and forgettable release posts", moment: "release week"
+    }],
+    [/legal|law firm|contract|founder|dispute|attorney/i, {
+      mode: "market", category: "Legal Services", seo: "small business contracts", audience,
+      topic: "small business contract review", pain: "signing unclear contracts and hoping nothing goes wrong", outcome: "fewer expensive disputes",
+      action: "review contracts before problems start", benefit: "clear legal guidance for practical business decisions",
+      proof: "contract review, plain-English risk notes, and founder-focused next steps", risk: "unclear terms, missed obligations, and expensive disputes", moment: "signing a contract"
+    }],
+    [/tutor|math|student|grade|homework/i, {
+      mode: "market", category: "Tutoring", seo: "online math tutoring", audience,
+      topic: "online math tutoring", pain: "homework stress and falling confidence", outcome: "stronger math confidence and better grades",
+      action: "help students understand math step by step", benefit: "patient explanations, targeted practice, and visible progress",
+      proof: "skill checks, clear explanations, and practice that meets the student where they are", risk: "memorizing steps without understanding and avoiding homework", moment: "the next math test"
+    }],
+    [/sustainable travel|travel|tour|local guide|trip/i, {
+      mode: "market", category: "Travel", seo: "sustainable travel", audience,
+      topic: "small-group sustainable travel", pain: "tourist traps and trips that feel disconnected from local life", outcome: "a richer trip with lighter impact",
+      action: "travel with local guides in smaller groups", benefit: "local insight, thoughtful pacing, and more responsible experiences",
+      proof: "small groups, local guides, and community-minded itineraries", risk: "overcrowded tours, shallow experiences, and avoidable waste", moment: "the next meaningful trip"
+    }],
+    [/dog grooming|mobile grooming|pet grooming|grooming service/i, {
+      mode: "market", category: "Dog Grooming", seo: "mobile dog grooming", audience,
+      topic: "mobile dog grooming", pain: "stressful salon drop-offs and messy at-home grooming attempts", outcome: "a cleaner dog without the extra errand",
+      action: "book grooming at home", benefit: "convenient grooming, calmer appointments, and a fresh-looking dog",
+      proof: "at-home service, coat care, nail trims, and appointment convenience", risk: "matted coats, stressful travel, and skipped grooming routines", moment: "bath day"
+    }],
+    [/florist|flowers|bouquet|anniversary|gift/i, {
+      mode: "market", category: "Florist", seo: "seasonal bouquets", audience,
+      topic: "seasonal bouquets", pain: "generic gifts that feel like an afterthought", outcome: "a thoughtful gift that feels personal",
+      action: "send seasonal flowers for meaningful moments", benefit: "fresh flowers, local design, and easy gifting",
+      proof: "seasonal stems, thoughtful color choices, and delivery or pickup details", risk: "last-minute gifts, wilted flowers, and generic arrangements", moment: "a birthday or anniversary"
+    }],
+    [/candle|home fragrance|soy wax|home decor/i, {
+      mode: "market", category: "Candles", seo: "soy candles", audience,
+      topic: "hand-poured soy candles", pain: "overpowering scents and forgettable home decor", outcome: "a calmer evening at home",
+      action: "choose a subtle scent for the room", benefit: "subtle fragrance, warm light, and a calmer atmosphere",
+      proof: "hand-poured soy wax, balanced scents, and thoughtful packaging", risk: "overpowering fragrance, uneven burns, and impulse-buy clutter", moment: "a quiet evening at home"
+    }],
+    [/\bcrm\b|sales team|track leads|project management|remote team|organize tasks|deadlines/i, {
+      mode: "market", category: "Business Software", seo: "team productivity software", audience,
+      topic: "simple team software", pain: "missed follow-ups, scattered tasks, and unclear ownership", outcome: "a more organized team with visible next steps",
+      action: "organize work and follow up consistently", benefit: "clear priorities, fewer missed tasks, and easier follow-through",
+      proof: "shared status, practical reminders, and one place for the next step", risk: "lost leads, missed deadlines, and duplicated work", moment: "the next busy workweek"
+    }],
+    [/grocery delivery|fresh food|groceries/i, {
+      mode: "market", category: "Grocery Delivery", seo: "grocery delivery", audience,
+      topic: "affordable grocery delivery", pain: "last-minute grocery runs and empty-fridge stress", outcome: "fresh food at home with less running around",
+      action: "get affordable fresh groceries delivered", benefit: "fresh essentials, simple ordering, and time back",
+      proof: "affordable staples, convenient delivery, and family-friendly options", risk: "forgotten ingredients, impulse spending, and another rushed store trip", moment: "a busy weeknight"
+    }],
+    [/construction|renovation|remodel|kitchen|bathroom|home addition/i, {
+      mode: "market", category: "Home Renovation", seo: "home renovation", audience,
+      topic: "thoughtful home renovation", pain: "unclear estimates, shifting timelines, and renovation stress", outcome: "a home that works better for daily life",
+      action: "plan a kitchen, bathroom, or home addition", benefit: "clear planning, skilled building, and practical design",
+      proof: "detailed scopes, realistic timelines, and craftsmanship built for daily use", risk: "scope surprises, poor communication, and expensive rework", moment: "the first renovation consultation"
+    }],
+    [/hair salon|haircut|hair color|styling|salon/i, {
+      mode: "market", category: "Hair Salon", seo: "low maintenance hair", audience,
+      topic: "low-maintenance hair", pain: "styles that look good once but are hard to live with", outcome: "hair that feels polished on ordinary days",
+      action: "choose a cut or color that fits daily life", benefit: "wearable cuts, thoughtful color, and realistic styling advice",
+      proof: "personal consultations, practical upkeep guidance, and styles built around real routines", risk: "high-maintenance color, unclear expectations, and a cut that does not fit", moment: "the next salon appointment"
+    }],
+    [/dentist|dental|teeth|cleaning|oral care/i, {
+      mode: "market", category: "Dentistry", seo: "family dentist", audience,
+      topic: "gentle family dental care", pain: "putting off care because appointments feel stressful", outcome: "a healthier smile with less anxiety",
+      action: "book preventive or emergency dental care", benefit: "gentle cleanings, clear explanations, and convenient care",
+      proof: "preventive visits, calm communication, and help when something hurts", risk: "delayed care, avoidable pain, and dental anxiety", moment: "the next dental appointment"
+    }],
+    [/childcare|daycare|preschool|toddlers|play-based learning/i, {
+      mode: "market", category: "Childcare", seo: "play based preschool", audience,
+      topic: "safe play-based childcare", pain: "uncertainty about care, routines, and early learning", outcome: "a safe place where children can grow with confidence",
+      action: "choose care that supports play and learning", benefit: "safe routines, caring teachers, and purposeful play",
+      proof: "age-appropriate activities, consistent communication, and a welcoming environment", risk: "unclear routines, poor communication, and a setting that does not fit", moment: "the first childcare tour"
+    }],
+    [/financial advisor|wealth|invest|budget|financial plan/i, {
+      mode: "market", category: "Financial Planning", seo: "financial advisor", audience,
+      topic: "practical financial planning", pain: "guessing about budgets, investing, and long-term goals", outcome: "a clearer plan for the money ahead",
+      action: "budget, invest, and plan long-term goals", benefit: "clear priorities, practical guidance, and a plan that can evolve",
+      proof: "goal-based planning, plain-English explanations, and regular progress reviews", risk: "avoiding decisions, chasing trends, and planning without priorities", moment: "the next financial milestone"
+    }],
+    [/lawn|landscap|yard|garden/i, {
+      mode: "market", category: "Lawn Care", seo: "eco friendly lawn care", audience,
+      topic: "eco-friendly lawn care", pain: "a struggling yard and harsh chemical treatments", outcome: "a healthier yard that feels good to use",
+      action: "care for the yard with fewer harsh chemicals", benefit: "healthier grass, thoughtful landscaping, and lower-impact care",
+      proof: "seasonal maintenance, practical planting, and treatment choices explained clearly", risk: "wasted treatments, unhealthy soil, and a yard that never improves", moment: "the start of the growing season"
+    }],
+    [/personal chef|meal prep|weekly meals|prepared meals/i, {
+      mode: "market", category: "Personal Chef", seo: "personal chef meal prep", audience,
+      topic: "healthy weekly meal prep", pain: "another week of rushed dinners and takeout decisions", outcome: "good meals at home without nightly planning",
+      action: "get healthy weekly meals prepared at home", benefit: "personalized meals, less cleanup, and easier weeknights",
+      proof: "menu planning, fresh preparation, and meals matched to household needs", risk: "food waste, repetitive takeout, and stressful dinner decisions", moment: "the start of a busy week"
+    }],
+    [/pottery|workshop|creative hobby|craft class|art class/i, {
+      mode: "market", category: "Creative Workshops", seo: "beginner pottery class", audience,
+      topic: "beginner-friendly pottery workshops", pain: "wanting a creative hobby but not knowing where to start", outcome: "a relaxing weekend spent making something real",
+      action: "try pottery in a welcoming beginner class", benefit: "hands-on guidance, creative time, and a finished piece",
+      proof: "beginner instruction, provided materials, and a relaxed small-group setting", risk: "intimidating classes, missing supplies, and never making time to begin", moment: "the next free weekend"
+    }],
     [/section 508|wcag|accessib/i, {
       topic: "accessibility preflight", pain: "last-minute accessibility issues",
       outcome: "a confident, documented handoff", action: "scan mixed-format deliverables",
@@ -275,11 +601,15 @@ function localIdeas(input) {
     }]
   ];
   const profile = (profiles.find(([pattern]) => pattern.test(sentence)) || [null, {
-    topic: fallbackTopic || product.toLowerCase(), pain: `the slow way to ${fallbackTopic || "get results"}`,
-    outcome: "a faster, clearer result", action: sentence.split(/,| and /i)[0].toLowerCase(),
-    proof: "clear next steps and measurable progress", asset: "repeatable workflow",
-    risk: "avoidable delays and missed details"
+    mode: "market", category: "Small Business", seo: product, audience,
+    topic: product, pain: "guessing through a decision without enough useful detail",
+    outcome: "a result that fits the real need", action: "choose the next step with more confidence",
+    benefit: "clear value, useful details, and a straightforward next step",
+    proof: "specific benefits, practical information, and clear expectations",
+    risk: "unclear options, rushed decisions, and disappointing results", moment: "the next important decision"
   }])[1];
+  if (profile.mode === "market") return marketIdeas(input, profile);
+  if (/\b(dog|puppy|cat|kitten|pet)\b/i.test(sentence)) return petIdeas(input);
   const { topic, pain, outcome, action, proof, asset, risk } = profile;
   const topicArticle = /^[aeiou]/i.test(topic) ? "an" : "a";
   const captionDetails = [
