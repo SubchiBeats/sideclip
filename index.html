@@ -225,14 +225,23 @@
                 <label class="field copy-field"><span>Supporting line <small id="bodyCount">0 / 145</small></span><textarea id="editBody" maxlength="145"></textarea></label>
                 <label class="field copy-field"><span>Call to action <small id="ctaCount">0 / 34</small></span><input id="editCta" maxlength="34" value="See how it works"></label>
                 <label class="field copy-field caption-field"><span>Post caption <small id="captionCount">0 / 1600</small></span><textarea id="editCaption" maxlength="1600" placeholder="A complete caption to publish with the video"></textarea></label>
+                <div class="caption-tools">
+                  <label class="field"><span>Caption platform</span><select id="captionPlatform"><option value="balanced">Balanced</option><option value="linkedin">LinkedIn</option><option value="instagram">Instagram</option><option value="tiktok">TikTok / Reels</option></select></label>
+                  <button class="ghost-button" id="adaptCaptionButton" type="button">Adapt caption</button>
+                </div>
                 <label class="field"><span>Accent color</span><input id="editColor" type="color" value="#d7ff39"></label>
                 <div class="quality-panel" id="qualityPanel"><b id="qualityScore">Publish readiness: 100</b><p id="qualityIssues">Relevant, concise, and ready to render.</p></div>
                 <label class="field"><span>Visual style</span><select id="visualStyle"><option value="orbit">Orbit</option><option value="checklist">Checklist</option><option value="spotlight">Spotlight</option><option value="cards">Floating cards</option><option value="grid">Signal grid</option><option value="waves">Flowing waves</option></select></label>
                 <label class="field"><span>Background media</span><select id="editAsset"><option value="">Procedural animation</option></select></label>
                 <label class="field"><span>Exported voiceover</span><select id="voiceAsset"><option value="">No audio track</option></select></label>
                 <label class="field"><span>Narration voice</span><select id="voiceSelect"><option value="">System default</option></select></label>
+                <p class="voice-note">SideClip prioritizes the most natural voices installed by your browser or operating system. Availability varies by device.</p>
+                <div class="voice-controls">
+                  <label class="field"><span>Speaking pace</span><input id="voiceRate" type="range" min="0.75" max="1.15" step="0.05" value="0.95"></label>
+                  <label class="field"><span>Voice tone</span><input id="voicePitch" type="range" min="0.85" max="1.15" step="0.05" value="1"></label>
+                </div>
                 <div class="tool-row">
-                  <button class="ghost-button" id="speakButton" type="button">Narrate preview</button>
+                  <button class="ghost-button" id="speakButton" type="button">Preview narration</button>
                   <button class="ghost-button" id="recordVoiceButton" type="button">Record voiceover</button>
                 </div>
                 <div class="tool-row">

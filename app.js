@@ -219,7 +219,7 @@ $("#newBrief").addEventListener("click", () => showView("brief"));
 $("#backToPlan").addEventListener("click", () => showView("calendar"));
 
 function openEditor(item) {
-  state.current = {...item, caption: item.caption || `${item.hook}\n\n${item.body}\n\n${item.cta}.`, visual: item.visual || "orbit", color: item.color || (item.format === "Story" ? "#ff725c" : item.format === "Educate" ? "#7095ff" : "#d7ff39")};
+  state.current = {...item, caption: item.caption || `${item.hook}\n\n${item.body}\n\n${item.cta}.`, sourceCaption: item.caption || `${item.hook}\n\n${item.body}\n\n${item.cta}.`, visual: item.visual || "orbit", color: item.color || (item.format === "Story" ? "#ff725c" : item.format === "Educate" ? "#7095ff" : "#d7ff39")};
   $("#editFormat").value = state.current.format;
   $("#editHook").value = state.current.hook;
   $("#editBody").value = state.current.body;
@@ -235,6 +235,7 @@ function openEditor(item) {
 ["editFormat", "editHook", "editBody", "editCta", "editCaption", "editColor", "visualStyle"].forEach(id => {
   $(`#${id}`).addEventListener("input", () => {
     state.current = {
+      ...state.current,
       format: $("#editFormat").value,
       hook: $("#editHook").value,
       body: $("#editBody").value,
@@ -759,8 +760,27 @@ $("#assetUpload").addEventListener("change", async event => {
 });
 
 function populateVoices() {
-  const voices = speechSynthesis.getVoices();
-  $("#voiceSelect").innerHTML = `<option value="">System default</option>${voices.map(voice => `<option value="${escapeHtml(voice.name)}">${escapeHtml(voice.name)} · ${voice.lang}</option>`).join("")}`;
+  const selected = $("#voiceSelect").value;
+  const voices = speechSynthesis.getVoices().sort((a, b) => voiceScore(b) - voiceScore(a) || a.name.localeCompare(b.name));
+  const options = voices.map(voice => {
+    const recommended = voiceScore(voice) >= 5 ? "Recommended - " : "";
+    return `<option value="${escapeHtml(voice.name)}">${recommended}${escapeHtml(voice.name)} · ${voice.lang}</option>`;
+  }).join("");
+  $("#voiceSelect").innerHTML = `<option value="">System default</option>${options}`;
+  if (selected && voices.some(voice => voice.name === selected)) $("#voiceSelect").value = selected;
+  else {
+    const naturalVoice = voices.find(voice => voiceScore(voice) >= 5);
+    if (naturalVoice) $("#voiceSelect").value = naturalVoice.name;
+  }
+}
+function voiceScore(voice) {
+  const name = voice.name.toLowerCase();
+  let score = 0;
+  if (/natural|neural|enhanced|premium|online/.test(name)) score += 8;
+  if (/aria|ava|andrew|brian|emma|guy|jenny|michelle|ryan|sonia|steffan/.test(name)) score += 4;
+  if (/english|en-us|en-gb|en-au|en-ca/.test(`${name} ${voice.lang.toLowerCase()}`)) score += 2;
+  if (/compact|espeak|festival/.test(name)) score -= 5;
+  return score;
 }
 if ("speechSynthesis" in window) {
   populateVoices();
@@ -771,6 +791,8 @@ $("#speakButton").addEventListener("click", () => {
   speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(`${state.current.hook}. ${state.current.body}. ${state.current.cta}`);
   utterance.voice = speechSynthesis.getVoices().find(voice => voice.name === $("#voiceSelect").value) || null;
+  utterance.rate = Number($("#voiceRate").value);
+  utterance.pitch = Number($("#voicePitch").value);
   speechSynthesis.speak(utterance);
   $("#previewPlay").click();
 });
@@ -819,6 +841,24 @@ function downloadBlob(name, type, content) {
 $("#subtitleButton").addEventListener("click", () => {
   const content = `1\n00:00:00,000 --> 00:00:02,500\n${state.current.hook}\n\n2\n00:00:02,500 --> 00:00:05,000\n${state.current.body}\n\n3\n00:00:05,000 --> 00:00:06,000\n${state.current.cta}\n`;
   downloadBlob("sideclip-captions.srt", "text/plain", content);
+});
+function platformCaption(platform) {
+  const details = state.current.sourceCaption || state.current.caption || `${state.current.body}\n\n${state.current.cta}.`;
+  const product = $("#product").value.trim() || "your business";
+  const tags = `#${product.replace(/[^a-z0-9]/gi, "")} #ContentMarketing #SmallBusiness`;
+  const variants = {
+    balanced: details,
+    linkedin: `${details}\n\nWhat would you add from your own workflow?\n\n${tags}`,
+    instagram: `Save this for your next project.\n\n${details}\n\n${tags} #SocialMediaTips`,
+    tiktok: `Quick breakdown:\n\n${details}\n\n${tags} #LearnOnTikTok`
+  };
+  return variants[platform].slice(0, 1600);
+}
+$("#adaptCaptionButton").addEventListener("click", () => {
+  state.current.caption = platformCaption($("#captionPlatform").value);
+  $("#editCaption").value = state.current.caption;
+  updateQualityUi();
+  toast("Caption adapted without losing the full story.");
 });
 $("#shareButton").addEventListener("click", async () => {
   const text = state.current.caption;

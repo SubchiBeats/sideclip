@@ -47,3 +47,13 @@ test("editor supports varied visuals and complete post captions", () => {
   for (const style of ["orbit", "checklist", "spotlight", "cards", "grid", "waves"]) assert.match(app, new RegExp(style));
   assert.match(app, /state\.current\.caption/);
 });
+
+test("hero, dark actions, narration, and platform captions are polished", () => {
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+  assert.match(styles, /\.mini-copy-coral\{[^}]*margin-bottom/);
+  assert.match(styles, /\[data-theme="dark"\] \.button-dark,\[data-theme="dark"\] \.button-lime/);
+  for (const id of ["voiceRate", "voicePitch", "captionPlatform", "adaptCaptionButton"]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(app, /function voiceScore/);
+  assert.match(app, /utterance\.rate/);
+  assert.match(app, /function platformCaption/);
+});

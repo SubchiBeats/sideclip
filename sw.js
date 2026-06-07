@@ -1,4 +1,4 @@
-const CACHE = "sideclip-v1.4";
+const CACHE = "sideclip-v1.5";
 const CORE = ["/", "/index.html", "/styles.css", "/theme.js", "/app.js", "/icon.svg", "/manifest.webmanifest", "/privacy.html"];
 
 self.addEventListener("install", event => {
