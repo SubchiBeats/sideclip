@@ -1,0 +1,32 @@
+{
+  "name": "sideclip",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zero-cost, self-hosted short-form video planning and rendering studio",
+  "keywords": [
+    "short-form-video",
+    "social-media",
+    "self-hosted",
+    "ollama",
+    "pwa",
+    "video-generator"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SubchiBeats/sideclip.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SubchiBeats/sideclip/issues"
+  },
+  "homepage": "https://github.com/SubchiBeats/sideclip#readme",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "SideClip",
+  "short_name": "SideClip",
+  "description": "Private short-form video planning and rendering studio",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2efe5",
+  "theme_color": "#11110f",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

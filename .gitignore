@@ -1,0 +1,7 @@
+outputs/
+work/
+data/
+.env
+.DS_Store
+Thumbs.db
+*.webm

@@ -1,0 +1,11 @@
+services:
+  sideclip:
+    build: .
+    ports:
+      - "4173:4173"
+    volumes:
+      - sideclip-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  sideclip-data:
