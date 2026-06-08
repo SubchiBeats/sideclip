@@ -23,12 +23,34 @@ const state = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 let toastTimer;
+let persistenceTimer;
+let accountSaveTimer;
+const DRAFT_KEY = "sideclip-draft-v1";
+const LAST_PROJECT_KEY = "sideclip-last-project";
 
 function toast(message) {
   $("#toast").textContent = message;
   $("#toast").classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => $("#toast").classList.remove("show"), 3000);
+}
+
+function hasCampaignContent(data = projectData()) {
+  return Boolean(String(data.brief?.product || "").trim() || String(data.brief?.description || "").trim() || (data.plan || []).length);
+}
+
+function saveLocalDraft() {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...projectData(), savedAt: new Date().toISOString() }));
+  } catch {}
+}
+
+function schedulePersistence() {
+  clearTimeout(persistenceTimer);
+  persistenceTimer = setTimeout(saveLocalDraft, 350);
+  if (!state.user || !hasCampaignContent()) return;
+  clearTimeout(accountSaveTimer);
+  accountSaveTimer = setTimeout(() => saveProject({ silent: true }).catch(() => {}), 1400);
 }
 
 async function api(url, options = {}) {
@@ -202,6 +224,7 @@ async function generatePlan() {
   }
   $("#planCount").textContent = "30";
   renderPlan();
+  schedulePersistence();
 }
 
 $("#briefForm").addEventListener("submit", async event => {
@@ -209,6 +232,8 @@ $("#briefForm").addEventListener("submit", async event => {
   await generatePlan();
   showView("calendar");
 });
+$("#briefForm").addEventListener("input", schedulePersistence);
+$("#briefForm").addEventListener("change", schedulePersistence);
 
 function renderPlan(filter = "All") {
   const items = filter === "All" ? state.plan : state.plan.filter(item => item.format === filter);
@@ -257,8 +282,11 @@ function openEditor(item) {
       color: $("#editColor").value,
       visual: $("#visualStyle").value
     };
+    const planItem = state.plan.find(item => item.day === state.current.day);
+    if (planItem) Object.assign(planItem, state.current);
     updateQualityUi();
     updatePreview();
+    schedulePersistence();
   });
 });
 
@@ -576,7 +604,13 @@ async function loadSession() {
     $("#engineLabel").textContent = result.ai === "ollama" ? "LOCAL AI ACTIVE" : "OFFLINE ENGINE";
     $("#engineDescription").textContent = `${result.ai === "ollama" ? "Private Ollama generation" : "Quality-gated local generation"} · v${result.version || "1.2.0"}`;
     updateAccountUi();
-    if (state.user) await Promise.all([loadProjects(), loadAssets()]);
+    if (state.user) {
+      await Promise.all([loadProjects(), loadAssets()]);
+      const lastProject = localStorage.getItem(LAST_PROJECT_KEY);
+      const project = state.projects.find(item => item.id === lastProject) || state.projects[0];
+      if (project) await loadProject(project.id, { quiet: true });
+      else if (hasCampaignContent()) await saveProject({ silent: true });
+    }
   } catch { toast("SideClip server is unavailable. Guest mode is active."); }
 }
 
@@ -614,6 +648,8 @@ $("#authForm").addEventListener("submit", async event => {
     $("#authDialog").close();
     toast(`Welcome, ${state.user.name}.`);
     await Promise.all([loadProjects(), loadAssets()]);
+    if (state.projects.length) await loadProject(state.projects[0].id, { quiet: true });
+    else if (hasCampaignContent()) await saveProject({ silent: true });
   } catch (error) { $("#authMessage").textContent = error.message; }
 });
 $("#logoutButton").addEventListener("click", async () => {
@@ -642,7 +678,7 @@ async function loadProjects() {
 }
 function renderProjects() {
   $("#projectsEmpty").style.display = state.projects.length ? "none" : "block";
-  $("#projectsEmpty").querySelector("b").textContent = state.user ? "No saved projects yet." : "Sign in to save your work.";
+  $("#projectsEmpty").querySelector("b").textContent = state.user ? "No saved projects yet." : "Sign in to sync your automatic device draft.";
   $("#projectList").innerHTML = state.projects.map(project => `
     <article class="project-card" data-id="${project.id}">
       <span>${new Date(project.updatedAt).toLocaleDateString()}</span>
@@ -658,41 +694,60 @@ function projectData() {
     plan: state.plan, current: state.current, selectedAsset: state.selectedAsset, voiceAsset: state.voiceAsset
   };
 }
-async function saveProject() {
-  if (!state.user) { $("#authDialog").showModal(); return; }
+async function saveProject(options = {}) {
+  if (!state.user) {
+    saveLocalDraft();
+    if (!options.silent) $("#authDialog").showModal();
+    return;
+  }
   const result = await api("/api/projects", { method: "POST", body: JSON.stringify({
     id: state.projectId, name: $("#product").value || "Untitled campaign", data: projectData()
   }) });
   state.projectId = result.project.id;
-  toast("Project saved.");
-  await loadProjects();
+  localStorage.setItem(LAST_PROJECT_KEY, state.projectId);
+  const index = state.projects.findIndex(project => project.id === state.projectId);
+  if (index >= 0) state.projects[index] = result.project;
+  else state.projects.unshift(result.project);
+  renderProjects();
+  if (!options.silent) toast("Project saved.");
 }
-async function loadProject(projectId) {
-  const project = state.projects.find(item => item.id === projectId);
-  if (!project) return;
-  state.projectId = project.id;
-  const data = project.data;
+function applyProjectData(data) {
   Object.entries(data.brief || {}).forEach(([key, value]) => { const input = $(`#${key}`); if (input) input.value = value; });
   state.plan = data.plan || [];
-  let upgraded = false;
-  if (planNeedsUpgrade(state.plan)) {
-    await generatePlan();
-    state.projectId = project.id;
-    upgraded = true;
-    toast("This older plan was upgraded with stronger, publish-ready copy.");
-  }
   state.voiceAsset = data.voiceAsset || null;
   $("#planCount").textContent = state.plan.length;
   renderPlan();
-  if (upgraded) openEditor(state.plan[0]);
-  else if (data.current) openEditor(data.current);
+  if (data.current) openEditor(data.current);
+  else if (state.plan.length) openEditor(state.plan[0]);
   if (data.selectedAsset) selectAsset(data.selectedAsset);
-  toast("Project opened.");
+}
+function restoreLocalDraft() {
+  try {
+    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+    if (!draft || !hasCampaignContent(draft)) return false;
+    state.projectId = null;
+    applyProjectData(draft);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function loadProject(projectId, options = {}) {
+  const project = state.projects.find(item => item.id === projectId);
+  if (!project) return;
+  state.projectId = project.id;
+  localStorage.setItem(LAST_PROJECT_KEY, project.id);
+  applyProjectData(project.data || {});
+  saveLocalDraft();
+  if (!options.quiet) toast("Project opened exactly as saved.");
 }
 async function deleteProject(projectId) {
   if (!confirm("Delete this project permanently?")) return;
   await api(`/api/projects/${projectId}`, { method: "DELETE" });
-  if (state.projectId === projectId) state.projectId = null;
+  if (state.projectId === projectId) {
+    state.projectId = null;
+    localStorage.removeItem(LAST_PROJECT_KEY);
+  }
   await loadProjects();
 }
 $("#saveProjectButton").addEventListener("click", saveProject);
@@ -733,6 +788,7 @@ function renderAssets() {
     if (asset.type.startsWith("audio/")) {
       state.voiceAsset = asset.id;
       renderAssets();
+      schedulePersistence();
       toast("Voiceover selected for export.");
     } else selectAsset(asset.id);
   }));
@@ -740,7 +796,7 @@ function renderAssets() {
 async function selectAsset(assetId) {
   state.selectedAsset = assetId || null;
   const asset = state.assets.find(item => item.id === assetId);
-  if (!asset) { state.assetElement = null; updatePreview(); return; }
+  if (!asset) { state.assetElement = null; updatePreview(); schedulePersistence(); return; }
   const element = document.createElement(asset.type.startsWith("image/") ? "img" : "video");
   element.crossOrigin = "same-origin";
   element.src = asset.url;
@@ -750,11 +806,12 @@ async function selectAsset(assetId) {
   if (element.play) element.play().catch(() => {});
   state.assetElement = element;
   $("#editAsset").value = assetId;
-  renderAssets(); updatePreview(); toast("Background media selected.");
+  renderAssets(); updatePreview(); schedulePersistence(); toast("Background media selected.");
 }
 $("#editAsset").addEventListener("change", event => selectAsset(event.target.value));
 $("#voiceAsset").addEventListener("change", event => {
   state.voiceAsset = event.target.value || null;
+  schedulePersistence();
   toast(state.voiceAsset ? "Voiceover selected for export." : "Voiceover removed.");
 });
 $("#assetUpload").addEventListener("change", async event => {
@@ -887,6 +944,7 @@ $("#adaptCaptionButton").addEventListener("click", () => {
   state.current.caption = platformCaption($("#captionPlatform").value);
   $("#editCaption").value = state.current.caption;
   updateQualityUi();
+  schedulePersistence();
   toast("Caption adapted with a fresh accurate angle.");
 });
 $("#shareButton").addEventListener("click", async () => {
@@ -902,10 +960,15 @@ $("#openMediaButton").addEventListener("click", () => showView("assets"));
 
 async function boot() {
   $(".register-field").style.display = "none";
-  await generatePlan();
-  openEditor(state.plan[0]);
-  showView("brief");
+  const restored = restoreLocalDraft();
   await loadSession();
+  if (!state.plan.length) {
+    await generatePlan();
+    openEditor(state.plan[0]);
+    showView("brief");
+  } else if (!restored && !state.projectId) {
+    showView("brief");
+  }
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 boot();

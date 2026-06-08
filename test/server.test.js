@@ -85,7 +85,7 @@ test("password hashes are salted and verifiable", async () => {
 test("account and project API lifecycle", async t => {
   const port = 43000 + process.pid % 1000;
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "sideclip-test-"));
-  const child = spawn(process.execPath, ["server.js"], {
+  let child = spawn(process.execPath, ["server.js"], {
     cwd: path.join(__dirname, ".."),
     env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", DATA_DIR: dataDir },
     stdio: "ignore"
@@ -109,6 +109,19 @@ test("account and project API lifecycle", async t => {
   assert.equal(saved.status, 201);
   const list = await fetch(`${base}/api/projects`, { headers: { Cookie: cookie } });
   assert.equal((await list.json()).projects.length, 1);
+  child.kill();
+  await new Promise(resolve => child.once("exit", resolve));
+  child = spawn(process.execPath, ["server.js"], {
+    cwd: path.join(__dirname, ".."),
+    env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", DATA_DIR: dataDir },
+    stdio: "ignore"
+  });
+  for (let i = 0; i < 30; i++) {
+    try { if ((await fetch(`${base}/api/health`)).ok) break; } catch {}
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  const restoredSession = await fetch(`${base}/api/me`, { headers: { Cookie: cookie } });
+  assert.equal((await restoredSession.json()).user.email, "test@example.com");
   const exported = await fetch(`${base}/api/export`, { headers: { Cookie: cookie } });
   assert.equal((await exported.json()).projects.length, 1);
   const upload = await fetch(`${base}/api/uploads`, {

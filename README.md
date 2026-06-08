@@ -32,6 +32,7 @@ a useful production loop without introducing another monthly bill:
 | --- | :---: |
 | Secure local accounts with salted `scrypt` hashes | ✅ |
 | Persistent private projects and media library | ✅ |
+| Automatic device drafts, account autosave, and last-project restore | ✅ |
 | Built-in zero-cost content planning engine | ✅ |
 | Product-specific hook angles and publish-readiness checks | ✅ |
 | Six distinct procedural video styles | ✅ |
@@ -76,6 +77,11 @@ Prompts stay between SideClip and your configured Ollama server.
 On Windows, after installing Ollama and pulling the model once, you can also
 double-click `run-local-ai.ps1`. SideClip uses schema-constrained output and
 its publish-readiness checks to reject weak local-model suggestions.
+
+SideClip automatically keeps an unsigned-in draft in the visitor's browser.
+Signed-in campaigns are also autosaved to the private SideClip server and the
+last opened campaign is restored on return. Sign-in sessions are stored as
+hashed tokens and remain valid through normal server restarts for up to 30 days.
 
 ## Architecture
 

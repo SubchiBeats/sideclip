@@ -30,13 +30,14 @@ const mimeTypes = {
   ".mp4": "video/mp4", ".webm": "video/webm", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".weba": "audio/webm"
 };
 const uploadTypes = new Set(["image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm", "audio/mpeg", "audio/wav", "audio/ogg", "audio/webm"]);
-const sessions = new Map();
 const attempts = new Map();
-let db = { users: [], projects: [], assets: [] };
+let db = { users: [], projects: [], assets: [], sessions: [] };
 let writeQueue = Promise.resolve();
-setInterval(() => {
+setInterval(async () => {
   const now = Date.now();
-  for (const [token, session] of sessions) if (session.expiresAt < now) sessions.delete(token);
+  const sessionCount = db.sessions.length;
+  db.sessions = db.sessions.filter(session => session.expiresAt >= now);
+  if (db.sessions.length !== sessionCount) await saveDb();
   for (const [key, times] of attempts) {
     const recent = times.filter(time => now - time < 60_000);
     if (recent.length) attempts.set(key, recent);
@@ -79,6 +80,7 @@ function cleanWords(value, max) {
   return `${base.slice(0, max - 1)}.`;
 }
 function safeUser(user) { return { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt }; }
+function tokenHash(token) { return crypto.createHash("sha256").update(String(token || "")).digest("hex"); }
 function cookies(req) {
   return Object.fromEntries((req.headers.cookie || "").split(";").filter(Boolean).map(part => {
     const at = part.indexOf("=");
@@ -87,7 +89,7 @@ function cookies(req) {
 }
 function currentUser(req) {
   const token = cookies(req).sideclip_session;
-  const session = token && sessions.get(token);
+  const session = token && db.sessions.find(item => item.tokenHash === tokenHash(token));
   if (!session || session.expiresAt < Date.now()) return null;
   return db.users.find(user => user.id === session.userId) || null;
 }
@@ -134,7 +136,7 @@ function sessionCookie(token, clear = false) {
 }
 function makeSession(userId) {
   const token = id();
-  sessions.set(token, { userId, expiresAt: Date.now() + SESSION_AGE * 1000 });
+  db.sessions.push({ tokenHash: tokenHash(token), userId, expiresAt: Date.now() + SESSION_AGE * 1000 });
   return token;
 }
 async function saveDb() {
@@ -813,18 +815,23 @@ async function api(req, res, url) {
     if (db.users.some(user => user.email === email)) return send(res, 409, { error: "An account already exists for this email." });
     const user = { id: id(), name, email, password: await hashPassword(password), createdAt: new Date().toISOString() };
     db.users.push(user);
+    const token = makeSession(user.id);
     await saveDb();
-    return send(res, 201, { user: safeUser(user) }, { "Set-Cookie": sessionCookie(makeSession(user.id)) });
+    return send(res, 201, { user: safeUser(user) }, { "Set-Cookie": sessionCookie(token) });
   }
   if (req.method === "POST" && url.pathname === "/api/login") {
     if (rateLimited(req, "auth", 8)) return send(res, 429, { error: "Too many attempts. Wait one minute." });
     const input = await body(req);
     const user = db.users.find(item => item.email === clean(input.email, 160).toLowerCase());
     if (!user || !(await verifyPassword(String(input.password || ""), user.password))) return send(res, 401, { error: "Incorrect email or password." });
-    return send(res, 200, { user: safeUser(user) }, { "Set-Cookie": sessionCookie(makeSession(user.id)) });
+    const token = makeSession(user.id);
+    await saveDb();
+    return send(res, 200, { user: safeUser(user) }, { "Set-Cookie": sessionCookie(token) });
   }
   if (req.method === "POST" && url.pathname === "/api/logout") {
-    sessions.delete(cookies(req).sideclip_session);
+    const hash = tokenHash(cookies(req).sideclip_session);
+    db.sessions = db.sessions.filter(session => session.tokenHash !== hash);
+    await saveDb();
     return send(res, 200, { ok: true }, { "Set-Cookie": sessionCookie("", true) });
   }
   if (req.method === "POST" && url.pathname === "/api/generate") {
@@ -895,7 +902,7 @@ async function api(req, res, url) {
     db.users = db.users.filter(item => item.id !== user.id);
     db.projects = db.projects.filter(project => project.userId !== user.id);
     db.assets = db.assets.filter(asset => asset.userId !== user.id);
-    for (const [token, session] of sessions) if (session.userId === user.id) sessions.delete(token);
+    db.sessions = db.sessions.filter(session => session.userId !== user.id);
     await saveDb();
     return send(res, 200, { ok: true }, { "Set-Cookie": sessionCookie("", true) });
   }
@@ -923,6 +930,10 @@ async function serve(req, res, url) {
 async function start() {
   await fsp.mkdir(UPLOAD_DIR, { recursive: true });
   try { db = JSON.parse(await fsp.readFile(DB_FILE, "utf8")); } catch { await saveDb(); }
+  db.users = Array.isArray(db.users) ? db.users : [];
+  db.projects = Array.isArray(db.projects) ? db.projects : [];
+  db.assets = Array.isArray(db.assets) ? db.assets : [];
+  db.sessions = Array.isArray(db.sessions) ? db.sessions.filter(session => session.expiresAt >= Date.now()) : [];
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
     try {

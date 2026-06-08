@@ -60,3 +60,12 @@ test("hero, dark actions, narration, and platform captions are polished", () => 
   assert.match(app, /fresh accurate angle/);
   assert.match(app, /fitTextBlock\(ctx, hook, 310, 8, 34, 13, 800\)/);
 });
+
+test("campaigns autosave locally and restore exact account projects", () => {
+  assert.match(app, /sideclip-draft-v1/);
+  assert.match(app, /schedulePersistence/);
+  assert.match(app, /saveProject\(\{ silent: true \}\)/);
+  assert.match(app, /sideclip-last-project/);
+  assert.match(app, /Project opened exactly as saved/);
+  assert.doesNotMatch(app, /older plan was upgraded/);
+});
