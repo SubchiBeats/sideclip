@@ -31,6 +31,10 @@ test("video renderer fits supporting copy and centers CTA text", () => {
   assert.match(app, /planNeedsUpgrade/);
   assert.match(app, /ctx\.rect\(18, 160, 324, 260\)/);
   assert.match(app, /ctx\.rect\(30, 464, 300, 72\)/);
+  assert.match(app, /fitTextBlock\(ctx, renderBody, 296, 14, 9, 600, 1\.28, 70\)/, "body text must be fitted to the panel height");
+  assert.match(html, /width="1080" height="1920"/, "video must export at 1080x1920");
+  assert.match(app, /ctx\.setTransform\(scale, 0, 0, scale, 0, 0\)/);
+  assert.match(app, /quality\.blockers\.length > 0/, "render gate must use blocking issues");
 });
 
 test("theme toggle is persistent and hero copy uses readable panels", () => {
@@ -58,7 +62,27 @@ test("hero, dark actions, narration, and platform captions are polished", () => 
   assert.match(app, /function platformCaption/);
   assert.match(app, /captionVariant/);
   assert.match(app, /fresh accurate angle/);
-  assert.match(app, /fitTextBlock\(ctx, hook, 310, 8, 34, 13, 800\)/);
+  assert.match(app, /fitTextBlock\(ctx, hook, 310, 34, 13, 800, 1\.08, 244\)/);
+});
+
+test("shared generator powers the client, plan readiness, and offline fallback", () => {
+  const sw = fs.readFileSync(path.join(root, "sw.js"), "utf8");
+  assert.match(html, /<script src="generator\.js"><\/script>/);
+  assert.match(app, /SideClipGenerator\.localIdeas/);
+  assert.match(app, /SideClipGenerator\.ideaQuality/);
+  assert.doesNotMatch(app, /const templates = \{/, "weak client-side fallback templates must stay removed");
+  assert.match(sw, /generator\.js/);
+  assert.match(html, /id="planReadiness"/);
+  assert.match(app, /updatePlanReadiness/);
+  assert.match(app, /score-chip/);
+  assert.match(app, /srtTime/);
+});
+
+test("brief captures brand voice, goal, and banned words end to end", () => {
+  for (const id of ["voice", "avoid", "goal"]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(app, /voice: \$\("#voice"\)\.value/);
+  assert.match(app, /avoid: \$\("#avoid"\)\.value/);
+  assert.match(app, /goal: \$\("#goal"\)\.value/);
 });
 
 test("campaigns autosave locally and restore exact account projects", () => {

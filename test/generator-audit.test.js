@@ -57,6 +57,66 @@ test("broad business audit produces relevant, complete, varied content", () => {
   }
 });
 
+test("category matching keeps content in the right business", () => {
+  const organizer = { product: "Tidy Nest", audience: "overwhelmed parents", description: "A professional home organizing service that declutters closets, kitchens, and garages" };
+  const organizerIdeas = localIdeas(organizer);
+  const organizerText = organizerIdeas.map(idea => `${idea.hook} ${idea.body} ${idea.caption}`).join(" ");
+  assert.doesNotMatch(organizerText, /renovation|remodel|home addition|craftsmanship|skilled building/i, "an organizing service must not get renovation content");
+  assert.match(organizerText, /organized|declutter|closet/i);
+  assert.ok(organizerIdeas.every(idea => ideaQuality(idea, organizer).score === 100));
+
+  const cafe = { product: "Brew & Bark", audience: "dog owners", description: "A dog-friendly coffee shop with a fenced play yard and house-roasted espresso" };
+  const cafeIdeas = localIdeas(cafe);
+  const cafeText = cafeIdeas.map(idea => `${idea.hook} ${idea.body}`).join(" ");
+  assert.doesNotMatch(cafeText, /treat bag|nap spot|trained the humans|household rule/i, "a pet-friendly business must not be treated as a pet");
+  assert.match(cafeText, /coffee|espresso/i);
+  assert.ok(cafeIdeas.every(idea => ideaQuality(idea, cafe).score === 100));
+  const brokenEnding = /\b(and|or|with|without|to|from|in|a|an|the|that|who|for|next)\.$/i;
+  assert.ok(cafeIdeas.every(idea => !brokenEnding.test(idea.cta)), "calls to action must not be cut off mid-phrase");
+
+  const keepsake = { product: "Stitch & Story", audience: "new parents", description: "Handmade personalized baby blankets embroidered with names and birth dates" };
+  const keepsakeIdeas = localIdeas(keepsake);
+  assert.match(keepsakeIdeas.map(idea => `${idea.hook} ${idea.body}`).join(" "), /handmade|personalized/i);
+  assert.ok(keepsakeIdeas.every(idea => ideaQuality(idea, keepsake).score === 100), "handmade gift briefs must produce specific content");
+
+  const demo = { product: "FocusFlow", audience: "busy creative freelancers", description: "Plan their week, block distractions, and get meaningful work done without burning out." };
+  assert.ok(localIdeas(demo).every(idea => ideaQuality(idea, demo).score === 100), "the bundled demo brief must score 100");
+});
+
+test("verb-phrase actions stay grammatical across templates", () => {
+  const input = { product: "Oakline Build", audience: "homeowners planning renovations", description: "A residential construction company specializing in kitchens, bathrooms, and home additions" };
+  const text = localIdeas(input).map(idea => `${idea.hook} ${idea.body} ${idea.caption}`).join(" ");
+  assert.doesNotMatch(text, /\bmakes plan a\b|\bmakes now useful\b|\bwhat thoughtful a\b/i);
+});
+
+test("brand voice, campaign goal, and banned words shape the plan", () => {
+  const base = { product: "Sunrise Bakes", audience: "local families", description: "A neighborhood bakery making custom birthday cakes, fresh sourdough, and weekend pastries" };
+  const warm = localIdeas({ ...base, voice: "warm-expert" });
+  const playful = localIdeas({ ...base, voice: "playful-friend" });
+  assert.notDeepEqual(warm.map(idea => idea.caption), playful.map(idea => idea.caption), "different voices must produce different captions");
+  assert.ok(playful.every(idea => ideaQuality(idea, base).score === 100));
+
+  const signupInput = { ...base, goal: "Get more signups" };
+  const signups = localIdeas(signupInput);
+  assert.equal(signups[2].cta, "Start free today");
+  assert.equal(signups[29].cta, "Start free with Sunrise Bakes");
+  assert.equal(new Set(signups.map(idea => idea.cta)).size, 30);
+  assert.ok(signups.every(idea => ideaQuality(idea, signupInput).score === 100));
+
+  const safeInput = { ...base, avoid: "cheap, stress" };
+  const safeIdeas = localIdeas(safeInput);
+  assert.ok(safeIdeas.every(idea => !/cheap|stress/i.test(`${idea.hook} ${idea.body} ${idea.cta} ${idea.caption}`)), "banned words must not appear anywhere in the plan");
+  assert.equal(new Set(safeIdeas.map(idea => idea.hook)).size, 30, "banned-word repairs must keep hooks unique");
+  assert.ok(safeIdeas.every(idea => ideaQuality(idea, safeInput).score === 100));
+  const flagged = ideaQuality({
+    hook: "Why our cheap cakes always win",
+    body: "Our cakes cost less than every other bakery in the neighborhood, every day.",
+    cta: "Order a cake today",
+    caption: "Our custom birthday cakes and weekend pastries are made fresh in the neighborhood every morning, so every celebration tastes like it came from family."
+  }, safeInput);
+  assert.ok(flagged.blockers.some(issue => issue.includes("cheap")), "a banned word must block rendering");
+});
+
 test("market categories do not leak operational template language", () => {
   const leaked = /\ban? a\b|workflow|handoff|preflight|quality gate|human review|one-file|stakeholder|project-wide|complex work|measurable progress/i;
   for (const [product, audience, description] of briefs) {

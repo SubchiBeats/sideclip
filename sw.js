@@ -1,5 +1,5 @@
-const CACHE = "sideclip-v1.9";
-const CORE = ["/", "/index.html", "/styles.css", "/theme.js", "/app.js", "/icon.svg", "/manifest.webmanifest", "/privacy.html"];
+const CACHE = "sideclip-v1.11";
+const CORE = ["/", "/index.html", "/styles.css", "/theme.js", "/generator.js", "/app.js", "/icon.svg", "/manifest.webmanifest", "/privacy.html"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));

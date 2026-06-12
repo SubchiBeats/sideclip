@@ -64,81 +64,15 @@ async function api(url, options = {}) {
   return result;
 }
 
-const templates = {
-  Story: [
-    "POV: You finally stopped {pain}",
-    "I thought I needed more discipline. I needed {product}.",
-    "The tiny change that gave {audience} their evenings back",
-    "Nobody warned me success would feel this messy",
-    "A day in the life after {result}",
-    "The moment I realized busy was not productive",
-    "My Sunday-night reset used to take three hours",
-    "I almost quit before I changed this one thing",
-    "What burnout taught me about better systems",
-    "This is your sign to stop doing it the hard way"
-  ],
-  Educate: [
-    "3 mistakes keeping {audience} stuck",
-    "The 10-minute rule that changes your whole week",
-    "Why your current system keeps failing you",
-    "Before your next deadline, fix this hidden workflow gap",
-    "The difference between a plan and a wish",
-    "How to protect your best two hours",
-    "A simple framework for {result}",
-    "The productivity advice I wish I ignored sooner",
-    "Do this when everything feels urgent",
-    "One question that clears your entire to-do list"
-  ],
-  Promote: [
-    "Still {pain}? There is a better way.",
-    "Meet {product}: your unfair advantage",
-    "Your next great week starts here",
-    "What if {result} felt easy?",
-    "Built for {audience} who are done settling",
-    "Less busywork. More work that matters.",
-    "The tool your Monday has been waiting for",
-    "Turn scattered ideas into a clear next move",
-    "Finally, a smarter way to {result}",
-    "You bring the ambition. {product} brings the plan."
-  ]
-};
-const vagueHookPattern = /^(try this|do this|stop scrolling|you need this|this changes everything|wait for it|the secret|one simple trick|before you add another task)/i;
+function briefInput() {
+  return {
+    product: $("#product").value, audience: $("#audience").value, description: $("#description").value,
+    goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value
+  };
+}
 
 function copyQuality(idea) {
-  const hook = String(idea.hook || "").trim();
-  const body = String(idea.body || "").trim();
-  const cta = String(idea.cta || "").trim();
-  const caption = String(idea.caption || "").trim();
-  const stopWords = new Set(["about", "after", "again", "better", "helps", "people", "provides", "their", "there", "these", "those", "through", "using", "with"]);
-  const descriptionWords = ($("#description").value.toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter(word => !stopWords.has(word));
-  const product = $("#product").value.toLowerCase();
-  const audience = $("#audience").value.trim().toLowerCase();
-  const relevant = product && `${hook} ${body}`.toLowerCase().includes(product) ||
-    descriptionWords.some(word => `${hook} ${body}`.toLowerCase().includes(word));
-  const concrete = descriptionWords.some(word => `${hook} ${body} ${caption}`.toLowerCase().includes(word));
-  const bodyConcrete = descriptionWords.some(word => body.toLowerCase().includes(word));
-  const genericCopy = /chosen with care|clear value, useful details|straightforward next step|next important decision|truly fits|people decide whether|when details matter|the small detail people remember|without enough useful detail/i;
-  const hookTerms = (hook.toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter(word => !stopWords.has(word) && word !== product);
-  const bodyContinuesHook = hookTerms.some(word => body.toLowerCase().includes(word)) || descriptionWords.some(word => body.toLowerCase().includes(word));
-  const issues = [];
-  if (vagueHookPattern.test(hook)) issues.push("Replace the vague hook with a specific pain, result, or product insight.");
-  if (genericCopy.test(`${hook} ${body} ${caption}`)) issues.push("Make the idea more specific; it currently sounds like reusable filler.");
-  if (/^(everyone|anyone|people|customers?)$/.test(audience)) issues.push("Narrow the audience beyond “everyone” for more targeted posts.");
-  if (!relevant) issues.push("Connect the hook or supporting line more clearly to the product.");
-  if (!concrete) issues.push("Use concrete details from the brief, such as style, product type, result, or audience pain.");
-  if (!bodyContinuesHook && !bodyConcrete && genericCopy.test(body)) issues.push("Make the supporting line directly answer or continue the hook.");
-  if (hook.length < 18 || hook.length > 105) issues.push("Keep the hook between 18 and 105 characters.");
-  if (body.length < 45 || body.length > 145) issues.push("Keep the supporting line between 45 and 145 characters.");
-  if (cta.length < 8 || cta.length > 34) issues.push("Keep the call to action between 8 and 34 characters.");
-  if (caption.length < 140) issues.push("Add a caption with enough useful information to stand on its own.");
-  if (!descriptionWords.some(word => caption.toLowerCase().includes(word))) issues.push("Make the caption include a concrete detail from the campaign brief.");
-  const promiseMatch = hook.match(/^(\d+)\s|^(three|four|five)\s/i);
-  const promisedCount = promiseMatch ? Number(promiseMatch[1] || { three: 3, four: 4, five: 5 }[promiseMatch[2].toLowerCase()]) : 0;
-  if (promisedCount && !Array.from({ length: promisedCount }, (_, index) => caption.includes(`${index + 1}.`)).every(Boolean)) {
-    issues.push(`The caption must deliver all ${promisedCount} promised items.`);
-  }
-  if (/\?$/.test(hook) && caption.split("?").pop().trim().length < 80) issues.push("Answer the hook's question in the caption.");
-  return { score: Math.max(0, 100 - issues.length * 12), issues };
+  return SideClipGenerator.ideaQuality(idea, briefInput());
 }
 
 function planNeedsUpgrade(plan) {
@@ -162,62 +96,33 @@ $$(".choice").forEach(choice => {
   choice.addEventListener("click", () => setTimeout(() => choice.classList.toggle("selected", choice.querySelector("input").checked), 0));
 });
 
-function fill(template, values) {
-  return template
-    .replaceAll("{product}", values.product)
-    .replaceAll("{audience}", values.audience)
-    .replaceAll("{pain}", values.pain)
-    .replaceAll("{result}", values.result);
-}
-
 async function generatePlan() {
   const description = $("#description").value.trim();
   const values = {
     product: $("#product").value.trim() || "Your product",
-    audience: $("#audience").value.trim() || "your audience",
-    result: description ? description.charAt(0).toLowerCase() + description.slice(1).replace(/\.$/, "") : "get better results",
-    pain: "doing everything the hard way"
+    audience: $("#audience").value.trim() || "your audience"
   };
   const submit = $("#briefForm button[type=submit]");
   submit.disabled = true;
-  submit.firstChild.textContent = "Generating your content plan ";
+  submit.firstChild.textContent = $("#engineLabel").textContent.includes("LOCAL AI")
+    ? "Your local AI is writing 30 posts (1-2 min) "
+    : "Generating your content plan ";
   try {
     const result = await api("/api/generate", { method: "POST", body: JSON.stringify({
-      product: values.product, audience: values.audience, description, goal: $("#goal").value
+      product: values.product, audience: values.audience, description,
+      goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value
     }) });
     state.plan = result.ideas;
     $("#engineLabel").textContent = result.engine === "ollama" ? "LOCAL AI ACTIVE" : "OFFLINE ENGINE";
     $("#engineDescription").textContent = result.engine === "ollama" ? "Ideas generated by your private Ollama model." : "Template engine active. Connect free local Ollama for stronger generation.";
   } catch {
-    const selected = $$(".choice input:checked").map(i => i.value);
-    const formats = selected.length ? selected : ["Story", "Educate", "Promote"];
-    const support = [
-      "Catch the risk early, make the fix clear, and protect the final handoff.",
-      "Turn a complicated review into a focused list of practical next steps.",
-      "Document what was checked, what changed, and what still needs a person.",
-      "Move review upstream so the team can fix issues before approvals stack up.",
-      "Give every reviewer the same findings, priorities, and remaining risks.",
-      "Find repeat problems across the whole project instead of one file at a time.",
-      "Pair repeatable automated checks with visible, accountable human review.",
-      "Replace last-minute guesswork with a consistent delivery-ready process.",
-      "Explain the impact and the fix so feedback becomes action, not noise.",
-      "Create a credible record of the work behind every confident delivery."
-    ];
-    const actions = ["See the workflow", "Save the checklist", "Start a private review", "Review before delivery", "Build your action plan", "Document the work", "Catch issues earlier", "Simplify the handoff", "Try the three-step method", `Explore ${values.product}`];
-    state.plan = Array.from({length: 30}, (_, index) => {
-      const format = formats[index % formats.length];
-      const hook = fill(templates[format][Math.floor(index / formats.length) % templates[format].length], values);
-      const cycle = Math.floor(index / support.length);
-      const context = cycle === 1 ? ` Built for ${values.audience.split(",")[0]}.` : cycle === 2 ? ` Make it part of your next ${values.product} campaign.` : "";
-      const caption = `${hook}\n\n${support[index % support.length]}\n\n${actions[(index + cycle) % actions.length]}.\n\n#${values.product.replace(/[^a-z0-9]/gi, "")} #ShortFormVideo`;
-      return {
-        day: index + 1, format, hook,
-        body: `${support[index % support.length]}${context}`,
-        cta: actions[(index + cycle) % actions.length], caption,
-        visual: ["orbit", "checklist", "spotlight", "cards", "grid", "waves"][index % 6]
-      };
+    state.plan = SideClipGenerator.localIdeas({
+      product: values.product, audience: values.audience, description,
+      goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value
     });
-    toast("Using the built-in offline generator.");
+    $("#engineLabel").textContent = "OFFLINE ENGINE";
+    $("#engineDescription").textContent = "On-device generator active. Start the SideClip server to save projects or use local AI.";
+    toast("Server unreachable. Generated your plan on this device instead.");
   } finally {
     submit.disabled = false;
     submit.firstChild.textContent = "Generate my content plan ";
@@ -237,14 +142,33 @@ $("#briefForm").addEventListener("change", schedulePersistence);
 
 function renderPlan(filter = "All") {
   const items = filter === "All" ? state.plan : state.plan.filter(item => item.format === filter);
-  $("#calendarList").innerHTML = items.map((item, index) => `
-    <article class="calendar-card" data-day="${item.day}">
+  const qualities = new Map(state.plan.map(item => [item.day, copyQuality(item)]));
+  $("#calendarList").innerHTML = items.map(item => {
+    const format = ["Story", "Educate", "Promote"].includes(item.format) ? item.format : "Story";
+    const quality = qualities.get(item.day) || copyQuality(item);
+    return `
+    <article class="calendar-card" data-day="${Number(item.day) || 0}">
       <span class="calendar-day">DAY ${String(item.day).padStart(2, "0")}</span>
-      <span class="type-pill ${item.format}">${item.format.toUpperCase()}</span>
+      <span class="type-pill ${format}">${format.toUpperCase()}</span>
       <strong>${escapeHtml(item.hook)}</strong>
-      <button aria-label="Edit clip">→</button>
-    </article>`).join("");
+      <span class="score-chip ${quality.score === 100 ? "ready" : "attention"}" title="Publish readiness">${quality.score}</span>
+      <button aria-label="Edit day ${Number(item.day) || 0}">→</button>
+    </article>`;
+  }).join("");
   $$(".calendar-card").forEach(card => card.addEventListener("click", () => openEditor(state.plan.find(item => item.day === Number(card.dataset.day)))));
+  updatePlanReadiness(qualities);
+}
+
+function updatePlanReadiness(qualities = new Map(state.plan.map(item => [item.day, copyQuality(item)]))) {
+  const summary = $("#planReadiness");
+  if (!state.plan.length) { summary.textContent = ""; return; }
+  const scores = [...qualities.values()];
+  const average = Math.round(scores.reduce((sum, quality) => sum + quality.score, 0) / scores.length);
+  const needsWork = scores.filter(quality => quality.issues.length).length;
+  const topIssues = [...new Set(scores.flatMap(quality => quality.issues))].slice(0, 2).join(" ");
+  summary.textContent = needsWork
+    ? `Plan readiness ${average}/100 · ${needsWork} of ${state.plan.length} posts need attention. ${topIssues}`
+    : `Plan readiness 100/100 · All ${state.plan.length} posts are specific, complete, and ready to publish.`;
 }
 
 $$(".filter").forEach(button => button.addEventListener("click", () => {
@@ -297,9 +221,14 @@ function updateQualityUi() {
   $("#ctaCount").textContent = `${state.current.cta.length} / 34`;
   $("#captionCount").textContent = `${state.current.caption.length} / 1600`;
   $("#qualityScore").textContent = `Publish readiness: ${quality.score}`;
-  $("#qualityIssues").textContent = quality.issues.length ? quality.issues.join(" ") : "Specific, relevant, concise, and ready to render.";
+  const advisories = quality.issues.filter(issue => !quality.blockers.includes(issue));
+  $("#qualityIssues").textContent = quality.blockers.length
+    ? `Fix before rendering: ${quality.blockers.join(" ")}${advisories.length ? ` Then strengthen it: ${advisories.join(" ")}` : ""}`
+    : advisories.length
+      ? `Ready to render. Make it stronger: ${advisories.join(" ")}`
+      : "Specific, relevant, complete, and ready to render.";
   $("#qualityPanel").classList.toggle("warning", quality.issues.length > 0);
-  $("#renderButton").disabled = quality.issues.length > 0;
+  $("#renderButton").disabled = quality.blockers.length > 0;
 }
 
 const canvas = $("#previewCanvas");
@@ -338,26 +267,25 @@ function wrapText(context, text, maxWidth) {
   return lines;
 }
 
-function fitTextBlock(context, text, maxWidth, maxLines, startSize, minSize, weight = 700) {
-  let size = startSize;
-  let lines = [];
-  while (size >= minSize) {
+function fitTextBlock(context, text, maxWidth, startSize, minSize, weight, lineFactor, maxHeight) {
+  for (let size = startSize; size >= minSize; size -= 1) {
     context.font = `${weight} ${size}px Manrope`;
-    lines = wrapText(context, text, maxWidth);
-    if (lines.length <= maxLines) return { lines, size };
-    size -= 1;
+    const lines = wrapText(context, text, maxWidth);
+    const lineHeight = Math.round(size * lineFactor);
+    if (lines.length * lineHeight <= maxHeight) return { lines, size, lineHeight, font: context.font };
   }
   context.font = `${weight} ${minSize}px Manrope`;
-  lines = wrapText(context, text, maxWidth);
-  return { lines, size: minSize, fits: lines.length <= maxLines };
+  const lineHeight = Math.round(minSize * lineFactor);
+  const lines = wrapText(context, text, maxWidth).slice(0, Math.max(1, Math.floor(maxHeight / lineHeight)));
+  return { lines, size: minSize, lineHeight, font: context.font };
 }
 
-function drawTextBlock(context, block, x, y, lineHeight, color) {
+function drawTextBlock(context, block, x, y, color) {
   context.fillStyle = color;
-  context.font = `700 ${block.size}px Manrope`;
+  context.font = block.font;
   context.textAlign = "left";
   context.textBaseline = "top";
-  block.lines.forEach((line, index) => context.fillText(line, x, y + index * lineHeight));
+  block.lines.forEach((line, index) => context.fillText(line, x, y + index * block.lineHeight));
 }
 
 function fitSingleLine(context, text, maxWidth, startSize, minSize, weight = 800) {
@@ -441,11 +369,14 @@ function drawProcedural(context, style, progress, color) {
 
 function drawFrame(progress = 0) {
   const { format, hook, body, cta, color, visual = "orbit" } = state.current;
+  const scale = canvas.width / 360;
   const quality = copyQuality(state.current);
-  const bodyFits = !quality.issues.some(issue => issue.startsWith("Keep the supporting line"));
-  const renderBody = bodyFits ? body : "Supporting line is too long. Shorten it to 145 characters before rendering.";
+  const bodyFits = !quality.issues.some(issue => issue.startsWith("Supporting line must be"));
+  const renderBody = bodyFits ? body : "Supporting line must be 45-145 characters before rendering.";
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = "#11110f";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
   drawProcedural(ctx, visual, progress, color);
   if (state.assetElement) {
     const media = state.assetElement;
@@ -468,15 +399,14 @@ function drawFrame(progress = 0) {
   ctx.textBaseline = "alphabetic";
   ctx.fillText(format.toUpperCase(), 40, 41);
 
-  const hookBlock = fitTextBlock(ctx, hook, 310, 8, 34, 13, 800);
-  const hookLineHeight = Math.round(hookBlock.size * 1.08);
-  const hookHeight = hookBlock.lines.length * hookLineHeight;
+  const hookBlock = fitTextBlock(ctx, hook, 310, 34, 13, 800, 1.08, 244);
+  const hookHeight = hookBlock.lines.length * hookBlock.lineHeight;
   const hookY = Math.max(170, 414 - hookHeight);
   ctx.save();
   ctx.beginPath();
   ctx.rect(18, 160, 324, 260);
   ctx.clip();
-  drawTextBlock(ctx, hookBlock, 25, hookY, hookLineHeight, "#ffffff");
+  drawTextBlock(ctx, hookBlock, 25, hookY, "#ffffff");
   ctx.restore();
 
   ctx.globalAlpha = progress === 0 ? 1 : Math.min(1, .45 + progress * 1.8);
@@ -492,18 +422,18 @@ function drawFrame(progress = 0) {
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.fillText("WHY IT MATTERS", 32, 446);
-  const bodyBlock = fitTextBlock(ctx, renderBody, 296, 6, 14, 9, 600);
+  const bodyBlock = fitTextBlock(ctx, renderBody, 296, 14, 9, 600, 1.28, 70);
   ctx.save();
   ctx.beginPath();
   ctx.rect(30, 464, 300, 72);
   ctx.clip();
-  drawTextBlock(ctx, bodyBlock, 32, 466, Math.round(bodyBlock.size * 1.28), bodyFits ? "#f2efe5" : "#ff927f");
+  drawTextBlock(ctx, bodyBlock, 32, 466, bodyFits ? "#f2efe5" : "#ff927f");
   ctx.restore();
   ctx.globalAlpha = 1;
 
   ctx.shadowColor = "#00000066";
-  ctx.shadowBlur = 14;
-  ctx.shadowOffsetY = 5;
+  ctx.shadowBlur = 14 * scale;
+  ctx.shadowOffsetY = 5 * scale;
   const ctaGradient = ctx.createLinearGradient(24, 574, 336, 620);
   ctaGradient.addColorStop(0, color);
   ctaGradient.addColorStop(1, "#ffffff");
@@ -561,7 +491,7 @@ $("#editorForm").addEventListener("submit", async event => {
     destination.stream.getAudioTracks().forEach(track => stream.addTrack(track));
   }
   const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 3500000 });
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
   const chunks = [];
   recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   recorder.onstop = () => {
@@ -690,7 +620,7 @@ function renderProjects() {
 }
 function projectData() {
   return {
-    brief: { product: $("#product").value, description: $("#description").value, audience: $("#audience").value, goal: $("#goal").value },
+    brief: { product: $("#product").value, description: $("#description").value, audience: $("#audience").value, goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value },
     plan: state.plan, current: state.current, selectedAsset: state.selectedAsset, voiceAsset: state.voiceAsset
   };
 }
@@ -802,7 +732,7 @@ async function selectAsset(assetId) {
   element.src = asset.url;
   element.muted = true;
   element.loop = true;
-  await new Promise(resolve => { element.onload = resolve; element.onloadeddata = resolve; });
+  await new Promise(resolve => { element.onload = resolve; element.onloadeddata = resolve; element.onerror = resolve; });
   if (element.play) element.play().catch(() => {});
   state.assetElement = element;
   $("#editAsset").value = assetId;
@@ -908,8 +838,22 @@ function downloadBlob(name, type, content) {
   link.download = name; link.click();
   setTimeout(() => URL.revokeObjectURL(link.href), 3000);
 }
+function srtTime(ms) {
+  const hours = String(Math.floor(ms / 3600000)).padStart(2, "0");
+  const minutes = String(Math.floor(ms / 60000) % 60).padStart(2, "0");
+  const seconds = String(Math.floor(ms / 1000) % 60).padStart(2, "0");
+  return `${hours}:${minutes}:${seconds},${String(Math.round(ms % 1000)).padStart(3, "0")}`;
+}
 $("#subtitleButton").addEventListener("click", () => {
-  const content = `1\n00:00:00,000 --> 00:00:02,500\n${state.current.hook}\n\n2\n00:00:02,500 --> 00:00:05,000\n${state.current.body}\n\n3\n00:00:05,000 --> 00:00:06,000\n${state.current.cta}\n`;
+  const parts = [state.current.hook, state.current.body, state.current.cta];
+  const weights = parts.map(text => Math.max(1, String(text).trim().split(/\s+/).length));
+  const total = weights.reduce((sum, count) => sum + count, 0);
+  let cursor = 0;
+  const content = parts.map((text, index) => {
+    const start = cursor;
+    cursor = index === parts.length - 1 ? 6000 : Math.min(5500, cursor + Math.round((weights[index] / total) * 6000));
+    return `${index + 1}\n${srtTime(start)} --> ${srtTime(cursor)}\n${text}\n`;
+  }).join("\n");
   downloadBlob("sideclip-captions.srt", "text/plain", content);
 });
 function platformCaption(platform) {

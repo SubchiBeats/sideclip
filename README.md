@@ -34,13 +34,17 @@ a useful production loop without introducing another monthly bill:
 | Persistent private projects and media library | ✅ |
 | Automatic device drafts, account autosave, and last-project restore | ✅ |
 | Built-in zero-cost content planning engine | ✅ |
+| Brand voice profiles and brand-banned word enforcement | ✅ |
+| Goal-driven calls to action across the 30-day arc | ✅ |
 | Product-specific hook angles and publish-readiness checks | ✅ |
 | Six distinct procedural video styles | ✅ |
 | Complete hook-aligned social captions | ✅ |
+| Plan-wide readiness summary with per-post scores | ✅ |
 | Optional private AI through local Ollama | ✅ |
 | Uploaded image and video backgrounds | ✅ |
 | Recorded/uploaded voiceovers embedded in exports | ✅ |
-| Browser-rendered 9:16 WebM video | ✅ |
+| Browser-rendered 1080×1920 (9:16) WebM video | ✅ |
+| Full-quality content generation even when offline | ✅ |
 | Persistent light and dark themes | ✅ |
 | SRT captions, posting packs, and device sharing | ✅ |
 | Installable PWA and offline core interface | ✅ |
@@ -75,8 +79,15 @@ npm start
 Prompts stay between SideClip and your configured Ollama server.
 
 On Windows, after installing Ollama and pulling the model once, you can also
-double-click `run-local-ai.ps1`. SideClip uses schema-constrained output and
-its publish-readiness checks to reject weak local-model suggestions.
+double-click `run-local-ai.ps1`.
+
+SideClip treats the local model like a copywriter working with an editor: ideas
+are requested in small schema-constrained batches, every idea is scored by the
+publish-readiness reviewer, and failed drafts are sent back once with the
+specific feedback ("the caption did not deliver the promised 3 signs") before
+falling back to the built-in generator for any slot that still does not pass.
+Brand voice, campaign goal, and brand-banned words are part of every prompt.
+A full 30-post run on a small CPU model typically takes one to two minutes.
 
 SideClip automatically keeps an unsigned-in draft in the visitor's browser.
 Signed-in campaigns are also autosaved to the private SideClip server and the
@@ -88,7 +99,8 @@ hashed tokens and remain valid through normal server restarts for up to 30 days.
 ```text
 Browser / PWA
   ├─ campaign planner and clip editor
-  ├─ Canvas + MediaRecorder video renderer
+  ├─ shared generator module (works fully offline)
+  ├─ Canvas + MediaRecorder 1080×1920 video renderer
   ├─ microphone voiceover capture
   └─ captions, posting packs, and Web Share
          │
@@ -98,7 +110,11 @@ Zero-dependency Node server
   ├─ project and media ownership checks
   ├─ atomic local JSON persistence
   ├─ constrained private uploads
-  └─ offline generator or optional Ollama adapter
+  └─ shared generator module or optional Ollama adapter
+
+generator.js is one shared module: the server uses it for /api/generate and
+the browser loads the same file, so offline (PWA) plans match server plans
+exactly and publish-readiness scoring can never drift between the two.
 ```
 
 SideClip intentionally avoids a framework, external database, and runtime npm

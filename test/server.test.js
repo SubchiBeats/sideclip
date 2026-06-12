@@ -6,7 +6,22 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { localIdeas, ideaQuality, hashPassword, verifyPassword } = require("../server");
+const { localIdeas, ideaQuality, hashPassword, verifyPassword, ollamaIdeas, ollamaPrompt } = require("../server");
+const { cleanWords } = require("../generator");
+
+const ollamaInput = { product: "FocusFlow", audience: "busy creative freelancers", description: "Plan their week, block distractions, and get meaningful work done without burning out." };
+function aiIdea(n) {
+  return {
+    format: "Story",
+    hook: `Why FocusFlow protects week plan number ${n} from chaos`,
+    body: `FocusFlow plans your week around protected focus blocks and fewer distractions, variation ${n}.`,
+    cta: `Plan week ${n} with FocusFlow`,
+    caption: `Why FocusFlow protects week plan number ${n} from chaos. FocusFlow plans your week around protected focus blocks, fewer distractions, and meaningful work you can finish without burning out. Plan week ${n} with FocusFlow today.`
+  };
+}
+function stubResponse(ideas) {
+  return { ok: true, json: async () => ({ response: JSON.stringify({ ideas }) }) };
+}
 
 test("offline generator returns thirty structured ideas", () => {
   const ideas = localIdeas({ product: "SideClip", audience: "creators", description: "ship video faster" });
@@ -74,6 +89,84 @@ test("fashion briefs create specific posts and broad audiences lower readiness",
   assert.ok(localIdeas(broad).every(idea => ideaQuality(idea, broad).score < 100));
 });
 
+test("publish readiness separates render blockers from advisory guidance", () => {
+  const input = { product: "FocusFlow", audience: "freelancers", description: "Plan their week, block distractions, and get meaningful work done" };
+  const caption = "FocusFlow helps you plan the week with focus blocks, distraction limits, and a realistic schedule you can actually follow, so the important work gets finished.";
+  const blocked = ideaQuality({ hook: "Why FocusFlow protects your weekly plan from chaos", body: "Too short.", cta: "Try FocusFlow today", caption }, input);
+  assert.ok(blocked.blockers.includes("Supporting line must be 45–145 characters."));
+  assert.ok(blocked.blockers.every(issue => blocked.issues.includes(issue)));
+  const advisory = ideaQuality({
+    hook: "Why FocusFlow protects your weekly plan from chaos",
+    body: "FocusFlow plans your week around two protected deep work blocks every single day.",
+    cta: "Try FocusFlow today", caption
+  }, { ...input, audience: "everyone" });
+  assert.ok(advisory.issues.includes("Audience is too broad to create targeted content."));
+  assert.equal(advisory.blockers.length, 0, "advisory issues must not block rendering");
+  const missingCaption = ideaQuality({ hook: "Why FocusFlow protects your weekly plan from chaos", body: "FocusFlow plans your week around two protected deep work blocks every single day.", cta: "Try FocusFlow today", caption: "" }, input);
+  assert.ok(missingCaption.blockers.includes("Add a complete caption so the post can publish on its own."));
+  const inventedOffer = ideaQuality({ hook: "Why FocusFlow protects your weekly plan from chaos", body: "FocusFlow plans your week around two protected deep work blocks every single day.", cta: "Get 10% off your first order", caption }, input);
+  assert.ok(inventedOffer.blockers.some(issue => issue.includes("discounts")), "invented discounts must block publishing");
+});
+
+test("cleanWords truncates on word boundaries without dangling fragments", () => {
+  assert.equal(cleanWords("We will show you the easiest way to succeed", 40), "We will show you the easiest way.");
+  assert.equal(cleanWords("Meet the family behind Bark's famous treats", 30), "Meet the family behind Bark.");
+  assert.equal(cleanWords("Short enough already", 105), "Short enough already");
+});
+
+test("local AI generation batches requests and merges validated ideas", async t => {
+  process.env.OLLAMA_MODEL = "stub-model";
+  const realFetch = global.fetch;
+  t.after(() => { delete process.env.OLLAMA_MODEL; global.fetch = realFetch; });
+  let calls = 0;
+  global.fetch = async (url, options) => {
+    calls++;
+    const payload = JSON.parse(options.body);
+    assert.equal(payload.model, "stub-model");
+    assert.equal(payload.format.properties.ideas.minItems, 6);
+    const base = (calls - 1) * 6;
+    return stubResponse(Array.from({ length: 6 }, (_, i) => aiIdea(base + i + 1)));
+  };
+  const plan = await ollamaIdeas(ollamaInput);
+  assert.equal(calls, 5, "thirty ideas must be requested in five batches of six");
+  assert.equal(plan.length, 30);
+  assert.match(plan[0].hook, /number 1 from chaos/);
+  assert.match(plan[29].hook, /number 30 from chaos/);
+  assert.equal(new Set(plan.map(idea => idea.hook)).size, 30);
+  assert.ok(plan.every(idea => idea.quality === 100));
+});
+
+test("local AI retry sends reviewer feedback and salvages failed drafts", async t => {
+  process.env.OLLAMA_MODEL = "stub-model";
+  const realFetch = global.fetch;
+  t.after(() => { delete process.env.OLLAMA_MODEL; global.fetch = realFetch; });
+  const prompts = [];
+  let calls = 0;
+  global.fetch = async (url, options) => {
+    calls++;
+    const payload = JSON.parse(options.body);
+    prompts.push(payload.prompt);
+    if (calls <= 5) {
+      const base = (calls - 1) * 6;
+      return stubResponse(Array.from({ length: 6 }, (_, i) => base + i === 0 ? { ...aiIdea(1), hook: "Too short" } : aiIdea(base + i + 1)));
+    }
+    return stubResponse([aiIdea(99)]);
+  };
+  const plan = await ollamaIdeas(ollamaInput);
+  assert.equal(calls, 6, "one retry batch must follow the five generation batches");
+  assert.match(prompts[5], /failed editorial review/);
+  assert.match(prompts[5], /Hook must be 18–105 characters\./, "the retry prompt must quote the reviewer feedback");
+  assert.match(plan[0].hook, /number 99/, "the revised idea must land in the failed slot");
+});
+
+test("local AI prompts carry brand voice, goal, and banned words", () => {
+  const prompt = ollamaPrompt({ product: "X Studio", audience: "Y", description: "Z", voice: "premium-minimalist", goal: "Launch a product", avoid: "cheap, crazy" }, 6, new Set(["An old hook"]));
+  assert.match(prompt, /premium and minimal/);
+  assert.match(prompt, /product launch/i);
+  assert.match(prompt, /Never use these words: cheap, crazy/);
+  assert.match(prompt, /An old hook/);
+});
+
 test("password hashes are salted and verifiable", async () => {
   const first = await hashPassword("correct horse battery staple");
   const second = await hashPassword("correct horse battery staple");
@@ -96,6 +189,9 @@ test("account and project API lifecycle", async t => {
     try { if ((await fetch(`${base}/api/health`)).ok) break; } catch {}
     await new Promise(resolve => setTimeout(resolve, 100));
   }
+  const generatorFile = await fetch(`${base}/generator.js`);
+  assert.equal(generatorFile.status, 200);
+  assert.match(await generatorFile.text(), /SideClipGenerator/);
   const register = await fetch(`${base}/api/register`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: "Test User", email: "test@example.com", password: "a secure test password" })
