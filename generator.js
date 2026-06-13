@@ -473,14 +473,6 @@
     const sentence = description.replace(/[.!?]+$/, "");
     const businessContext = /grooming|service|owner|salon|appointment|shop|store|cafe|café|coffee|bakery|restaurant|brand|company|business|\bapp\b|product|hotel|boarding|daycare|training|walker|sitter|\bvet\b/i;
     if (/\b(dog|puppy|cat|kitten|pet)\b/i.test(sentence) && !businessContext.test(sentence)) return petIdeas(input);
-    const fallbackTopic = sentence
-      .replace(/^(help|scan|create|build|make|plan|find|turn|organize|diagnose|generate)\s+/i, "")
-      .split(/,| and | by | with | without /i)[0]
-      .trim()
-      .split(/\s+/)
-      .slice(0, 5)
-      .join(" ")
-      .toLowerCase();
     const profiles = [
       [/clothing|apparel|t-?shirt|vintage pants|fashion|streetwear|outfit|retro style/i, {
         mode: "market", category: "Fashion", seo: "retro clothing", audience,

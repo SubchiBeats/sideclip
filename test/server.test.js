@@ -137,6 +137,33 @@ test("local AI generation batches requests and merges validated ideas", async t 
   assert.ok(plan.every(idea => idea.source === "ai"), "model-written posts must be tagged as AI");
 });
 
+test("local AI repairs fixable drafts instead of discarding them", async t => {
+  process.env.OLLAMA_MODEL = "stub-model";
+  const realFetch = global.fetch;
+  t.after(() => { delete process.env.OLLAMA_MODEL; global.fetch = realFetch; });
+  let calls = 0;
+  global.fetch = async (url, options) => {
+    calls++;
+    const count = JSON.parse(options.body).format.properties.ideas.minItems;
+    const base = (calls - 1) * 6;
+    return stubResponse(Array.from({ length: count }, (_, i) => {
+      const idea = aiIdea(base + i + 1);
+      if (base + i === 0) idea.cta = "Click here right now to learn absolutely everything about this offer today";
+      if (base + i === 1) idea.body = "FocusFlow plans your week around protected focus blocks and fewer distractions every single day so the important work never slips through the cracks again.";
+      return idea;
+    }));
+  };
+  const diagnostics = { rejects: new Map(), repaired: 0 };
+  const plan = await ollamaIdeas({ ...ollamaInput, goal: "Get more signups" }, diagnostics);
+  assert.equal(calls, 5, "repaired drafts must not trigger extra retry or top-up batches");
+  assert.equal(plan.length, 30);
+  assert.ok(plan[0].cta.length >= 8 && plan[0].cta.length <= 34, "an over-long CTA must be repaired to a valid length");
+  assert.equal(plan[0].source, "ai", "a repaired draft is still model-written content");
+  assert.ok(plan[1].body.length <= 145, "an over-long supporting line must be trimmed at a word boundary");
+  assert.ok(plan.every(idea => idea.quality >= 88), "every kept post must clear the readiness bar");
+  assert.ok(diagnostics.repaired >= 2, "the diagnostics must count reclaimed drafts");
+});
+
 test("local AI drafts with invented claims are rejected and retried with feedback", async t => {
   process.env.OLLAMA_MODEL = "stub-model";
   const realFetch = global.fetch;
@@ -201,14 +228,16 @@ test("local AI retry sends reviewer feedback and salvages failed drafts", async 
     prompts.push(payload.prompt);
     if (calls <= 5) {
       const base = (calls - 1) * 6;
-      return stubResponse(Array.from({ length: 6 }, (_, i) => base + i === 0 ? { ...aiIdea(1), hook: "Too short" } : aiIdea(base + i + 1)));
+      // A too-short body is unrepairable (repair only trims over-long copy), so
+      // this draft must travel to the retry round rather than being salvaged.
+      return stubResponse(Array.from({ length: 6 }, (_, i) => base + i === 0 ? { ...aiIdea(1), body: "Tiny." } : aiIdea(base + i + 1)));
     }
     return stubResponse([aiIdea(99)]);
   };
   const plan = await ollamaIdeas(ollamaInput);
   assert.equal(calls, 6, "one retry batch must follow the five generation batches");
   assert.match(prompts[5], /failed editorial review/);
-  assert.match(prompts[5], /Hook must be 18–105 characters\./, "the retry prompt must quote the reviewer feedback");
+  assert.match(prompts[5], /Supporting line must be 45–145 characters\./, "the retry prompt must quote the reviewer feedback");
   assert.match(plan[0].hook, /number 99/, "the revised idea must land in the failed slot");
 });
 

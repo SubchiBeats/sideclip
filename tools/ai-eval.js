@@ -48,7 +48,7 @@ const pad = (value, width) => String(value).padEnd(width);
   console.log("-".repeat(48));
 
   const totals = { ai: 0, score: 0, dupes: 0, offers: 0, secs: 0 };
-  const diagnostics = { rejects: new Map() };
+  const diagnostics = { rejects: new Map(), repaired: 0 };
   for (const brief of selected) {
     const started = Date.now();
     let plan = null;
@@ -73,6 +73,7 @@ const pad = (value, width) => String(value).padEnd(width);
   console.log(`${pad("MEAN", 10)}${pad((totals.ai / n).toFixed(1), 7)}${pad((totals.score / n).toFixed(1), 10)}${pad((totals.dupes / n).toFixed(1), 7)}${pad((totals.offers / n).toFixed(1), 8)}${pad(Math.round(totals.secs / n), 6)}`);
   console.log(`\nai/30   = posts written by the local model (rest fell back to the built-in generator)`);
   console.log(`offers  = invented discounts/sales not present in the brief (should stay 0)`);
+  console.log(`reclaimed via repair across all briefs: ${diagnostics.repaired}`);
   const reasons = [...diagnostics.rejects.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
   if (reasons.length) {
     console.log(`\nTop reject reasons (fix the biggest to raise ai/30):`);

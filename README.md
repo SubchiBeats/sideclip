@@ -100,8 +100,13 @@ SideClip treats the local model like a copywriter working with an editor:
   freebies the brief never mentioned is rejected for AI drafts (the brief is the
   model's only knowledge, so an absent claim was invented) and flagged "verify
   before publishing" for human edits.
-- **Top-up rounds.** If review leaves slots empty after the retry, SideClip asks
-  for up to two fresh batches before any slot falls back to templates.
+- **Targeted repair.** Before discarding a draft, SideClip salvages the failure
+  modes the model hits most - over-long or duplicate calls to action, over-long
+  supporting lines, and weak product connection - with deterministic fixes
+  grounded in the product, goal, and the model's own words (never fabricated),
+  then re-reviews and keeps the result only if it now clears the bar.
+- **Top-up rounds.** If review still leaves slots empty after the retry, SideClip
+  asks for up to two fresh batches before any slot falls back to templates.
 - **Labeled output.** Model-written posts carry an "AI" chip in the content plan
   so you know exactly which days deserve a closer read before publishing.
 

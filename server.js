@@ -6,7 +6,7 @@ const fsp = fs.promises;
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { version: VERSION } = require("./package.json");
-const { clean, ideaQuality, localIdeas, parseAvoid, voices, voiceOf, goalDirections, assembleCaption, fewShotExamples } = require("./generator.js");
+const { clean, cleanWords, ideaQuality, localIdeas, parseAvoid, voices, voiceOf, goalDirections, goalCtas, assembleCaption, fewShotExamples } = require("./generator.js");
 
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, "data");
@@ -188,7 +188,8 @@ Quality rules:
 - If a hook promises a number (such as "3 signs"), put exactly that many short items in the "points" array; otherwise leave "points" empty.
 - Vary the angle: customer stories, common mistakes, how-to steps, comparisons, behind the scenes, proof, questions answered, and timely moments.
 - Avoid generic phrases like "right fit", "chosen with care", "clear value", "straightforward next step", "game changer", or "details matter".
-${avoid.length ? `- Never use these words: ${avoid.join(", ")}.\n` : ""}${usedHooks.size ? `- Do not reuse or closely echo these hooks already in the plan: ${[...usedHooks].slice(-12).join(" | ")}\n` : ""}- The cta is a short button label: a complete phrase of 8-32 characters with no hashtags.
+${avoid.length ? `- Never use these words: ${avoid.join(", ")}.\n` : ""}${usedHooks.size ? `- Do not reuse or closely echo these hooks already in the plan: ${[...usedHooks].slice(-12).join(" | ")}\n` : ""}- The cta is a short button label: 2 to 5 words, 8-32 characters, no hashtags or trailing detail.
+- Name the product "${clean(input.product, 80)}" or a concrete detail from the description in the hook and the body.
 - Use complete sentences. Keep hook <= 100 characters and body <= 140 characters.
 
 Return only JSON with an "ideas" array of exactly ${count} items, each with format, hook, body, cta, and points.`;
@@ -263,16 +264,52 @@ async function ollamaIdeas(input, diagnostics = null) {
     used.bodies.add(built.body);
     used.ctas.add(built.cta);
   };
+  // Deterministic salvage for the failure modes the eval shows the local model
+  // hits most: over-long or duplicate CTAs, over-long supporting lines, and
+  // weak product connection. Repairs are grounded in the product, goal, and the
+  // model's own words - never fabricated - so a repaired draft is re-reviewed
+  // and only kept if it now clears the same bar. Nothing here invents claims.
+  const product = clean(input.product, 80);
+  const ctaPool = (goalCtas(clean(input.goal, 80), product) || []).concat(["See how it works", "Learn more today", "Take the next step", "Start the conversation"]);
+  const pickCta = () => ctaPool.find(option => { const len = clean(option, 60).length; return len >= 8 && len <= 34 && !used.ctas.has(option); }) || "See how it works";
+  const repair = (idea, issues) => {
+    const fixed = { ...idea };
+    const ctaLen = clean(fixed.cta, 200).length;
+    if (ctaLen < 8 || ctaLen > 34 || issues.some(issue => issue.startsWith("Call to action")) || issues.includes("This call to action already appears in the plan.")) {
+      fixed.cta = pickCta();
+    }
+    if (clean(fixed.body, 400).length > 145) fixed.body = cleanWords(clean(fixed.body, 400), 145);
+    if (issues.some(issue => issue.startsWith("Hook needs a clearer product")) && product && !clean(fixed.hook, 200).toLowerCase().includes(product.toLowerCase())) {
+      fixed.hook = cleanWords(`${product}: ${clean(fixed.hook, 200)}`, 105);
+    }
+    if (issues.some(issue => issue.startsWith("Supporting line needs a clearer product")) && product && !clean(fixed.body, 200).toLowerCase().includes(product.toLowerCase())) {
+      const line = clean(fixed.body, 200);
+      fixed.body = cleanWords(`${product} ${line.charAt(0).toLowerCase()}${line.slice(1)}`, 145);
+    }
+    return fixed;
+  };
+  const tryAccept = (idea, slot) => {
+    const verdict = review(idea, slot);
+    if (verdict.ok) { accept(verdict.built, slot); return { accepted: true, issues: [] }; }
+    if (idea && idea.hook) {
+      const second = review(repair(idea, verdict.issues), slot);
+      if (second.ok) {
+        accept(second.built, slot);
+        if (diagnostics) diagnostics.repaired = (diagnostics.repaired || 0) + 1;
+        return { accepted: true, issues: [] };
+      }
+    }
+    return { accepted: false, issues: verdict.issues };
+  };
   for (let start = 0; start < 30; start += batchSize) {
     let batch = [];
     try { batch = await ollamaBatch(input, batchSize, used.hooks); } catch {}
     for (let offset = 0; offset < batchSize; offset++) {
       const idea = batch[offset];
-      const verdict = review(idea, start + offset);
-      if (verdict.ok) accept(verdict.built, start + offset);
-      else {
-        note(verdict.issues);
-        if (idea && idea.hook) rejected.push({ slot: start + offset, idea, issues: verdict.issues });
+      const result = tryAccept(idea, start + offset);
+      if (!result.accepted) {
+        note(result.issues);
+        if (idea && idea.hook) rejected.push({ slot: start + offset, idea, issues: result.issues });
       }
     }
   }
@@ -284,9 +321,8 @@ async function ollamaIdeas(input, diagnostics = null) {
     revised.forEach((idea, index) => {
       const target = group[index];
       if (!target || slots[target.slot] !== null) return;
-      const verdict = review(idea, target.slot);
-      if (verdict.ok) accept(verdict.built, target.slot);
-      else note(verdict.issues);
+      const result = tryAccept(idea, target.slot);
+      if (!result.accepted) note(result.issues);
     });
   }
   // Top-up: weak categories leave slots empty after the retry round. Ask for
@@ -300,9 +336,8 @@ async function ollamaIdeas(input, diagnostics = null) {
     batch.forEach((idea, index) => {
       const slot = empty[index];
       if (slot === undefined) return;
-      const verdict = review(idea, slot);
-      if (verdict.ok) accept(verdict.built, slot);
-      else note(verdict.issues);
+      const result = tryAccept(idea, slot);
+      if (!result.accepted) note(result.issues);
     });
   }
   const fallback = localIdeas(input);
@@ -319,8 +354,8 @@ async function ollamaIdeas(input, diagnostics = null) {
     finalUsed.bodies.add(chosen.body);
     finalUsed.ctas.add(chosen.cta);
     if (usable) aiCount++;
-    const { points, ...clean } = { ...backup, ...chosen };
-    return { ...clean, day: index + 1, source: usable ? "ai" : "template", quality: ideaQuality(chosen, input).score };
+    const { points, ...post } = { ...backup, ...chosen };
+    return { ...post, day: index + 1, source: usable ? "ai" : "template", quality: ideaQuality(chosen, input).score };
   });
   return aiCount ? plan : null;
 }
