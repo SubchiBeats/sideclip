@@ -67,7 +67,7 @@ async function api(url, options = {}) {
 function briefInput() {
   return {
     product: $("#product").value, audience: $("#audience").value, description: $("#description").value,
-    goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value
+    goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value, offerings: $("#offerings").value
   };
 }
 
@@ -110,7 +110,7 @@ async function generatePlan() {
   try {
     const result = await api("/api/generate", { method: "POST", body: JSON.stringify({
       product: values.product, audience: values.audience, description,
-      goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value
+      goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value, offerings: $("#offerings").value
     }) });
     state.plan = result.ideas;
     $("#engineLabel").textContent = result.engine === "ollama" ? "LOCAL AI ACTIVE" : "OFFLINE ENGINE";
@@ -118,7 +118,7 @@ async function generatePlan() {
   } catch {
     state.plan = SideClipGenerator.localIdeas({
       product: values.product, audience: values.audience, description,
-      goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value
+      goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value, offerings: $("#offerings").value
     });
     $("#engineLabel").textContent = "OFFLINE ENGINE";
     $("#engineDescription").textContent = "On-device generator active. Start the SideClip server to save projects or use local AI.";
@@ -620,7 +620,7 @@ function renderProjects() {
 }
 function projectData() {
   return {
-    brief: { product: $("#product").value, description: $("#description").value, audience: $("#audience").value, goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value },
+    brief: { product: $("#product").value, description: $("#description").value, audience: $("#audience").value, goal: $("#goal").value, voice: $("#voice").value, avoid: $("#avoid").value, offerings: $("#offerings").value },
     plan: state.plan, current: state.current, selectedAsset: state.selectedAsset, voiceAsset: state.voiceAsset
   };
 }

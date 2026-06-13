@@ -128,6 +128,23 @@ test("unsupported claims are flagged for verification", () => {
   assert.ok(!grounded.issues.some(issue => issue.startsWith("Verify this claim")), "copy grounded in the brief must not be flagged");
 });
 
+test("declared offerings ground claims and count as concrete detail", () => {
+  const base = { product: "Velvet Chair", audience: "busy professionals", description: "A neighborhood hair salon offering cuts, color, and low-maintenance styling" };
+  const idea = { hook: "Our certified stylists make low-maintenance color easy", body: "Velvet Chair pairs certified stylists with free parking for busy professionals.", cta: "Book at Velvet Chair", caption: "Velvet Chair pairs certified stylists, free parking, and low-maintenance color so busy professionals can look polished without the upkeep. Book your chair this week and skip the fuss." };
+
+  const ungrounded = ideaQuality(idea, base);
+  assert.ok(ungrounded.issues.some(issue => issue.startsWith("Verify this claim")), "a certification claim absent from the brief must be flagged");
+
+  const grounded = ideaQuality(idea, { ...base, offerings: "certified stylists, free parking, evening appointments" });
+  assert.ok(!grounded.issues.some(issue => issue.startsWith("Verify this claim")), "a claim listed in offerings must be accepted");
+
+  // Offerings also supply concrete brief detail to otherwise generic copy.
+  const sparse = { product: "Velvet Chair", audience: "busy professionals", description: "A salon" };
+  const post = { hook: "Why busy professionals choose Velvet Chair for balayage", body: "Velvet Chair brings balayage and gloss treatments to busy professionals.", cta: "Book at Velvet Chair", caption: "Velvet Chair brings balayage, gloss treatments, and quick blowouts to busy professionals who want salon results that last. Book your chair and keep it simple all month." };
+  const withFacts = ideaQuality(post, { ...sparse, offerings: "balayage, gloss treatments, quick blowouts" });
+  assert.ok(!withFacts.issues.includes("Use a concrete detail from the campaign brief."), "offerings terms must satisfy the concrete-detail check");
+});
+
 test("hybrid caption assembly guarantees publishable structure for AI ideas", () => {
   const input = { product: "Brew & Bark", audience: "dog owners", description: "A dog-friendly coffee shop with a fenced play yard and house-roasted espresso", voice: "playful-friend" };
 

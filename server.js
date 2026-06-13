@@ -169,6 +169,7 @@ function ollamaPrompt(input, count, usedHooks = new Set(), revisions = null) {
   const voice = voices[voiceOf(input)];
   const goalDirection = goalDirections[clean(input.goal, 80)] || "";
   const avoid = parseAvoid(input.avoid);
+  const offerings = clean(input.offerings, 240);
   const examples = revisions ? [] : fewShotExamples(input);
   const task = revisions
     ? `You previously wrote drafts that failed editorial review. Rewrite each draft so it passes, fixing every piece of feedback while keeping a similar topic:\n${revisions.map((item, index) => `${index + 1}. Draft hook: "${item.idea.hook}" | Draft body: "${item.idea.body}" | Feedback: ${item.issues.join(" ")}`).join("\n")}`
@@ -178,7 +179,7 @@ function ollamaPrompt(input, count, usedHooks = new Set(), revisions = null) {
 Campaign:
 - Product: ${clean(input.product, 80)}
 - Audience: ${clean(input.audience, 120)}
-- Description: ${clean(input.description, 400)}
+- Description: ${clean(input.description, 400)}${offerings ? `\n- Facts you may state (do not claim staff, perks, certifications, or guarantees beyond the description and these): ${offerings}` : ""}
 - ${voice.direction}${goalDirection ? `\n- ${goalDirection}` : ""}
 ${examples.length ? `\nHere are two on-brand examples for THIS business. Match their specificity and format, then write new, different ideas:\n${examples.join("\n")}\n` : ""}
 Quality rules:

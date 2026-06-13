@@ -36,8 +36,16 @@
     "she", "the", "them", "then", "they", "this", "that", "was", "what", "when", "where", "who", "why", "will", "you", "your",
     "all", "any", "each", "into", "from", "more", "most", "also", "than", "over", "very", "just", "some", "one", "two"
   ]);
+  // The brief's description plus the optional "what you actually offer" list
+  // form the ground truth: the only facts copy may state. Listing real
+  // specifics (services, perks, certifications) both grounds the content and
+  // turns claims that would otherwise be flagged as invented into legitimate,
+  // usable detail.
+  function knownFacts(input) {
+    return `${clean(input.description, 400)} ${clean(input.offerings, 240)}`.trim();
+  }
   function descriptionTerms(input) {
-    return (clean(input.description, 400).toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter(word => !STOP_WORDS.has(word));
+    return (knownFacts(input).toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter(word => !STOP_WORDS.has(word));
   }
 
   // Claims a business must be able to substantiate. If one appears in the copy
@@ -222,12 +230,14 @@
     if (!captionFulfillsPromise(idea)) issues.push("Caption must fulfill every numbered promise in the hook.");
     const bannedHit = parseAvoid(input.avoid).find(word => `${hook} ${body} ${cta} ${caption}`.toLowerCase().includes(word));
     if (bannedHit) issues.push(`Remove the brand-banned word "${bannedHit}".`);
-    if (offerPattern.test(`${hook} ${body} ${cta} ${caption}`) && !offerPattern.test(clean(input.description, 400))) {
+    const facts = knownFacts(input);
+    if (offerPattern.test(`${hook} ${body} ${cta} ${caption}`) && !offerPattern.test(facts)) {
       issues.push("Do not promise discounts or offers the campaign brief does not mention.");
     }
     const claimHit = (`${hook} ${body} ${cta} ${caption}`.match(claimPattern) || [null])[0];
-    if (claimHit && !clean(input.description, 400).toLowerCase().includes(claimHit.toLowerCase())) {
-      issues.push(`Verify this claim is true before publishing: "${claimHit}".`);
+    if (claimHit) {
+      const core = claimHit.toLowerCase().replace(/^our\s+/, "");
+      if (!facts.toLowerCase().includes(core)) issues.push(`Verify this claim is true before publishing: "${claimHit}".`);
     }
     return {
       score: Math.max(0, 100 - issues.length * 12),
@@ -805,5 +815,5 @@
     });
   }
 
-  return { clean, cleanWords, promisedCount, captionFulfillsPromise, ideaQuality, localIdeas, parseAvoid, voices, voiceOf, goalDirections, goalCtas, assembleCaption, fewShotExamples };
+  return { clean, cleanWords, promisedCount, captionFulfillsPromise, ideaQuality, localIdeas, parseAvoid, knownFacts, voices, voiceOf, goalDirections, goalCtas, assembleCaption, fewShotExamples };
 });

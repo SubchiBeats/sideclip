@@ -85,6 +85,8 @@ test("brief captures brand voice, goal, and banned words end to end", () => {
   assert.match(app, /goal: \$\("#goal"\)\.value/);
   assert.match(html, /maxlength="400"/, "the description field must allow grounding detail");
   assert.match(app, /source-chip/, "AI-written posts must be labeled in the plan");
+  assert.match(html, /id="offerings"/, "the brief must capture what the business actually offers");
+  assert.match(app, /offerings: \$\("#offerings"\)\.value/, "offerings must flow into generation and persistence");
 });
 
 test("campaigns autosave locally and restore exact account projects", () => {

@@ -96,10 +96,13 @@ SideClip treats the local model like a copywriter working with an editor:
   falls back to the built-in generator.
 - **Brand controls.** Brand voice, campaign goal, and brand-banned words are part
   of every prompt, and invented discounts are blocked at review.
-- **Claims grounding.** Copy that asserts staff, certifications, guarantees, or
-  freebies the brief never mentioned is rejected for AI drafts (the brief is the
-  model's only knowledge, so an absent claim was invented) and flagged "verify
-  before publishing" for human edits.
+- **Claims grounding.** The brief's description plus the optional "what you
+  actually offer" list are the only facts copy may state. Copy that asserts
+  staff, certifications, guarantees, or freebies outside that ground truth is
+  rejected for AI drafts and flagged "verify before publishing" for human
+  edits. Listing real specifics turns claims that would be flagged as invented
+  into legitimate, usable detail - so grounding the model makes it write *more*,
+  not less.
 - **Targeted repair.** Before discarding a draft, SideClip salvages the failure
   modes the model hits most - over-long or duplicate calls to action, over-long
   supporting lines, and weak product connection - with deterministic fixes

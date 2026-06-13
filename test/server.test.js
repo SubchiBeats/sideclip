@@ -252,6 +252,10 @@ test("local AI prompts carry brand voice, goal, banned words, and few-shot examp
   assert.match(prompt, /"hook":/, "the prompt must embed concrete example ideas");
   assert.match(prompt, /and points\./, "the schema instruction must mention the points field");
 
+  const withFacts = ollamaPrompt({ ...input, offerings: "certified bakers, gluten-free options, free delivery" }, 6, new Set());
+  assert.match(withFacts, /Facts you may state[^\n]*certified bakers, gluten-free options, free delivery/, "declared offerings must reach the prompt as stateable facts");
+  assert.doesNotMatch(prompt, /Facts you may state/, "the facts line is omitted when no offerings are given");
+
   const retryPrompt = ollamaPrompt(input, 2, new Set(), [{ idea: { hook: "Too short", body: "Tiny." }, issues: ["Hook must be 18–105 characters."] }]);
   assert.match(retryPrompt, /failed editorial review/);
   assert.doesNotMatch(retryPrompt, /on-brand examples for THIS business/, "retry prompts skip examples to stay focused on fixes");
