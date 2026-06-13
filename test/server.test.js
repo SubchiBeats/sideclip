@@ -134,6 +134,59 @@ test("local AI generation batches requests and merges validated ideas", async t 
   assert.match(plan[29].hook, /number 30 from chaos/);
   assert.equal(new Set(plan.map(idea => idea.hook)).size, 30);
   assert.ok(plan.every(idea => idea.quality === 100));
+  assert.ok(plan.every(idea => idea.source === "ai"), "model-written posts must be tagged as AI");
+});
+
+test("local AI drafts with invented claims are rejected and retried with feedback", async t => {
+  process.env.OLLAMA_MODEL = "stub-model";
+  const realFetch = global.fetch;
+  t.after(() => { delete process.env.OLLAMA_MODEL; global.fetch = realFetch; });
+  const prompts = [];
+  let calls = 0;
+  global.fetch = async (url, options) => {
+    calls++;
+    const payload = JSON.parse(options.body);
+    prompts.push(payload.prompt);
+    if (calls <= 5) {
+      const base = (calls - 1) * 6;
+      return stubResponse(Array.from({ length: 6 }, (_, i) => base + i === 0
+        ? { ...aiIdea(1), hook: "Our team guarantees your weekly plan stays on track" }
+        : aiIdea(base + i + 1)));
+    }
+    return stubResponse([aiIdea(99)]);
+  };
+  const plan = await ollamaIdeas(ollamaInput);
+  assert.equal(calls, 6);
+  assert.match(prompts[5], /Verify this claim is true before publishing/, "the retry must tell the model which claim was invented");
+  assert.match(plan[0].hook, /number 99/, "the unverifiable claim must not ship");
+});
+
+test("local AI tops up empty slots with fresh batches before falling back", async t => {
+  process.env.OLLAMA_MODEL = "stub-model";
+  process.env.OLLAMA_SEED = "7";
+  const realFetch = global.fetch;
+  t.after(() => { delete process.env.OLLAMA_MODEL; delete process.env.OLLAMA_SEED; global.fetch = realFetch; });
+  let calls = 0;
+  let seenSeed = null;
+  global.fetch = async (url, options) => {
+    calls++;
+    const payload = JSON.parse(options.body);
+    seenSeed = payload.options.seed;
+    const count = payload.format.properties.ideas.minItems;
+    const base = (calls - 1) * 6;
+    if (calls <= 5) {
+      return stubResponse(Array.from({ length: count }, (_, i) => i < 3 ? aiIdea(base + i + 1) : {}));
+    }
+    return stubResponse(Array.from({ length: count }, (_, i) => aiIdea(base + i + 1)));
+  };
+  const diagnostics = { rejects: new Map() };
+  const plan = await ollamaIdeas(ollamaInput, diagnostics);
+  assert.equal(calls, 7, "two top-up batches must follow when slots stay empty");
+  assert.equal(seenSeed, 7, "OLLAMA_SEED must reach the model options");
+  assert.equal(plan.filter(idea => idea.source === "ai").length, 27);
+  assert.equal(plan.filter(idea => idea.source === "template").length, 3);
+  assert.equal(new Set(plan.map(idea => idea.hook)).size, 30);
+  assert.ok(diagnostics.rejects.size >= 1, "diagnostics must record reject reasons");
 });
 
 test("local AI retry sends reviewer feedback and salvages failed drafts", async t => {
@@ -159,12 +212,20 @@ test("local AI retry sends reviewer feedback and salvages failed drafts", async 
   assert.match(plan[0].hook, /number 99/, "the revised idea must land in the failed slot");
 });
 
-test("local AI prompts carry brand voice, goal, and banned words", () => {
-  const prompt = ollamaPrompt({ product: "X Studio", audience: "Y", description: "Z", voice: "premium-minimalist", goal: "Launch a product", avoid: "cheap, crazy" }, 6, new Set(["An old hook"]));
+test("local AI prompts carry brand voice, goal, banned words, and few-shot examples", () => {
+  const input = { product: "Sunrise Bakes", audience: "local families", description: "A neighborhood bakery making custom birthday cakes, fresh sourdough, and weekend pastries", voice: "premium-minimalist", goal: "Launch a product", avoid: "cheap, crazy" };
+  const prompt = ollamaPrompt(input, 6, new Set(["An old hook"]));
   assert.match(prompt, /premium and minimal/);
   assert.match(prompt, /product launch/i);
   assert.match(prompt, /Never use these words: cheap, crazy/);
   assert.match(prompt, /An old hook/);
+  assert.match(prompt, /on-brand examples for THIS business/);
+  assert.match(prompt, /"hook":/, "the prompt must embed concrete example ideas");
+  assert.match(prompt, /and points\./, "the schema instruction must mention the points field");
+
+  const retryPrompt = ollamaPrompt(input, 2, new Set(), [{ idea: { hook: "Too short", body: "Tiny." }, issues: ["Hook must be 18–105 characters."] }]);
+  assert.match(retryPrompt, /failed editorial review/);
+  assert.doesNotMatch(retryPrompt, /on-brand examples for THIS business/, "retry prompts skip examples to stay focused on fixes");
 });
 
 test("password hashes are salted and verifiable", async () => {

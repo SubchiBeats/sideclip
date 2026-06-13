@@ -30,6 +30,20 @@
     return String(value || "").toLowerCase().split(/[,;\n]/).map(word => word.trim()).filter(word => word.length >= 3).slice(0, 20);
   }
 
+  const STOP_WORDS = new Set([
+    "about", "after", "again", "better", "helps", "people", "provides", "their", "there", "these", "those", "through", "using", "with",
+    "and", "are", "but", "can", "did", "for", "get", "got", "had", "has", "have", "her", "him", "his", "how", "its", "not", "our", "out",
+    "she", "the", "them", "then", "they", "this", "that", "was", "what", "when", "where", "who", "why", "will", "you", "your",
+    "all", "any", "each", "into", "from", "more", "most", "also", "than", "over", "very", "just", "some", "one", "two"
+  ]);
+  function descriptionTerms(input) {
+    return (clean(input.description, 400).toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter(word => !STOP_WORDS.has(word));
+  }
+
+  // Claims a business must be able to substantiate. If one appears in the copy
+  // but not in the brief, the writer (human or local AI) invented it.
+  const claimPattern = /\b(?:our (?:staff|team|experts?)|certified|licensed|award-?winning|guaranteed?|money-?back|years of experience|free (?:wifi|parking|shipping|delivery|consultation))\b/i;
+
   const voices = {
     "warm-expert": {
       label: "Warm expert",
@@ -104,6 +118,62 @@
     return banks[goal] || null;
   }
 
+  // Hybrid caption assembly: the model supplies the creative hook, body, cta,
+  // and (for numbered hooks) the list items. We build the caption around them
+  // so the structural checks - length, numbered-promise delivery, a concrete
+  // brief detail, and a closing call to action - pass by construction.
+  function assembleCaption(idea, input) {
+    const product = clean(input.product, 80) || "our work";
+    const hook = clean(idea.hook, 200);
+    const body = clean(idea.body, 300);
+    const cta = clean(idea.cta, 60).replace(/[.!?]+$/, "").trim();
+    const terms = descriptionTerms(input);
+    const count = promisedCount(hook);
+    const segments = [hook];
+    if (count) {
+      let points = (Array.isArray(idea.points) ? idea.points : [])
+        .map(point => clean(point, 120).replace(/^\s*\d+[.)]\s*/, "").trim())
+        .filter(Boolean);
+      if (points.length < count) {
+        for (const clause of body.split(/[.;\n]+/).map(part => part.trim()).filter(Boolean)) {
+          if (points.length >= count) break;
+          if (!points.includes(clause)) points.push(clause);
+        }
+      }
+      while (points.length < count) {
+        const term = terms[points.length % terms.length] || "every detail";
+        points.push(`${product} keeps ${term} front and center.`);
+      }
+      segments.push(points.slice(0, count).map((point, index) => `${index + 1}. ${point}`).join("\n"));
+    } else {
+      segments.push(body);
+    }
+    let core = segments.join("\n\n");
+    if (terms.length && !terms.some(term => core.toLowerCase().includes(term))) {
+      segments.push(`Built around what matters here: ${terms.slice(0, 3).join(", ")}.`);
+    }
+    segments.push(voiceLine(input, (Number(idea.day) || 1) - 1));
+    segments.push(`${cta}.`);
+    const tags = `${tag(product)} ${terms.slice(0, 2).map(tag).join(" ")}`.trim();
+    if (tags) segments.push(tags);
+    let caption = segments.join("\n\n");
+    if (caption.length < 170 && terms.length) {
+      caption = caption.replace(`${cta}.`, `${product} brings ${terms.slice(0, 3).join(", ")} together so it pays off.\n\n${cta}.`);
+    }
+    return caption.slice(0, 1600);
+  }
+
+  // Two on-brand offline posts used as few-shot examples so the local model
+  // sees the target specificity and format for this exact business.
+  function fewShotExamples(input) {
+    const pool = localIdeas(input).filter(idea => !promisedCount(idea.hook));
+    const story = pool.find(idea => idea.format === "Story");
+    const educate = pool.find(idea => idea.format === "Educate");
+    const picks = [story, educate].filter(Boolean);
+    while (picks.length < 2 && pool[picks.length]) picks.push(pool[picks.length]);
+    return picks.slice(0, 2).map(idea => JSON.stringify({ format: idea.format, hook: idea.hook, body: idea.body, cta: idea.cta, points: [] }));
+  }
+
   const blockingIssues = new Set([
     "Hook must be 18–105 characters.",
     "Supporting line must be 45–145 characters.",
@@ -121,13 +191,8 @@
     const caption = clean(idea.caption, 2000);
     const product = clean(input.product, 80).toLowerCase();
     const audience = clean(input.audience, 120).toLowerCase();
-    const stopWords = new Set([
-      "about", "after", "again", "better", "helps", "people", "provides", "their", "there", "these", "those", "through", "using", "with",
-      "and", "are", "but", "can", "did", "for", "get", "got", "had", "has", "have", "her", "him", "his", "how", "its", "not", "our", "out",
-      "she", "the", "them", "then", "they", "this", "that", "was", "what", "when", "where", "who", "why", "will", "you", "your",
-      "all", "any", "each", "into", "from", "more", "most", "also", "than", "over", "very", "just", "some", "one", "two"
-    ]);
-    const descriptionWords = (clean(input.description, 240).toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter(word => !stopWords.has(word));
+    const stopWords = STOP_WORDS;
+    const descriptionWords = descriptionTerms(input);
     const hookRelevant = product && hook.toLowerCase().includes(product) ||
       descriptionWords.some(word => hook.toLowerCase().includes(word));
     const bodyRelevant = product && body.toLowerCase().includes(product) ||
@@ -157,8 +222,12 @@
     if (!captionFulfillsPromise(idea)) issues.push("Caption must fulfill every numbered promise in the hook.");
     const bannedHit = parseAvoid(input.avoid).find(word => `${hook} ${body} ${cta} ${caption}`.toLowerCase().includes(word));
     if (bannedHit) issues.push(`Remove the brand-banned word "${bannedHit}".`);
-    if (offerPattern.test(`${hook} ${body} ${cta} ${caption}`) && !offerPattern.test(clean(input.description, 240))) {
+    if (offerPattern.test(`${hook} ${body} ${cta} ${caption}`) && !offerPattern.test(clean(input.description, 400))) {
       issues.push("Do not promise discounts or offers the campaign brief does not mention.");
+    }
+    const claimHit = (`${hook} ${body} ${cta} ${caption}`.match(claimPattern) || [null])[0];
+    if (claimHit && !clean(input.description, 400).toLowerCase().includes(claimHit.toLowerCase())) {
+      issues.push(`Verify this claim is true before publishing: "${claimHit}".`);
     }
     return {
       score: Math.max(0, 100 - issues.length * 12),
@@ -400,7 +469,7 @@
     const product = clean(input.product, 80) || "Your product";
     const rawAudience = clean(input.audience, 120) || "busy teams";
     const audience = rawAudience.split(/,| and | who /i)[0].trim() || "busy teams";
-    const description = clean(input.description, 240) || "get better results with less busywork";
+    const description = clean(input.description, 400) || "get better results with less busywork";
     const sentence = description.replace(/[.!?]+$/, "");
     const businessContext = /grooming|service|owner|salon|appointment|shop|store|cafe|café|coffee|bakery|restaurant|brand|company|business|\bapp\b|product|hotel|boarding|daycare|training|walker|sitter|\bvet\b/i;
     if (/\b(dog|puppy|cat|kitten|pet)\b/i.test(sentence) && !businessContext.test(sentence)) return petIdeas(input);
@@ -744,5 +813,5 @@
     });
   }
 
-  return { clean, cleanWords, promisedCount, captionFulfillsPromise, ideaQuality, localIdeas, parseAvoid, voices, voiceOf, goalDirections, goalCtas };
+  return { clean, cleanWords, promisedCount, captionFulfillsPromise, ideaQuality, localIdeas, parseAvoid, voices, voiceOf, goalDirections, goalCtas, assembleCaption, fewShotExamples };
 });

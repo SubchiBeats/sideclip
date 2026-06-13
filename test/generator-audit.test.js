@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { localIdeas, ideaQuality } = require("../server");
+const { assembleCaption, captionFulfillsPromise } = require("../generator");
 
 const briefs = [
   ["Sunrise Bakes", "local families", "A neighborhood bakery making custom birthday cakes, fresh sourdough, and weekend pastries"],
@@ -115,6 +116,37 @@ test("brand voice, campaign goal, and banned words shape the plan", () => {
     caption: "Our custom birthday cakes and weekend pastries are made fresh in the neighborhood every morning, so every celebration tastes like it came from family."
   }, safeInput);
   assert.ok(flagged.blockers.some(issue => issue.includes("cheap")), "a banned word must block rendering");
+});
+
+test("unsupported claims are flagged for verification", () => {
+  const cafe = { product: "Brew & Bark", audience: "dog owners", description: "A dog-friendly coffee shop with a fenced play yard and house-roasted espresso" };
+  const caption = "Brew & Bark pairs house-roasted espresso with a fenced play yard, so dog owners can slow down while their pups run. Come see the play yard for yourself this week.";
+  const claimy = ideaQuality({ hook: "Our staff is trained to watch your dog while you sip", body: "Brew & Bark gives dog owners a fenced play yard and house-roasted espresso.", cta: "Visit Brew & Bark", caption }, cafe);
+  assert.ok(claimy.issues.some(issue => issue.startsWith("Verify this claim")), "a staff claim absent from the brief must be flagged");
+  assert.ok(!claimy.blockers.some(issue => issue.startsWith("Verify this claim")), "claims stay advisory for human-edited copy");
+  const grounded = ideaQuality({ hook: "Why the fenced play yard makes Brew & Bark different", body: "Brew & Bark gives dog owners a fenced play yard and house-roasted espresso.", cta: "Visit Brew & Bark", caption }, cafe);
+  assert.ok(!grounded.issues.some(issue => issue.startsWith("Verify this claim")), "copy grounded in the brief must not be flagged");
+});
+
+test("hybrid caption assembly guarantees publishable structure for AI ideas", () => {
+  const input = { product: "Brew & Bark", audience: "dog owners", description: "A dog-friendly coffee shop with a fenced play yard and house-roasted espresso", voice: "playful-friend" };
+
+  const plainIdea = { day: 4, hook: "Meet the house-roasted espresso your dog already loves", body: "Our fenced play yard lets dogs run while you sip fresh espresso.", cta: "Visit Brew & Bark" };
+  const plain = assembleCaption(plainIdea, input);
+  assert.ok(plain.length >= 160, "assembled caption must be long enough to stand alone");
+  assert.match(plain, /Visit Brew & Bark\.\s*$|Visit Brew & Bark\.\n/);
+  assert.equal(ideaQuality({ ...plainIdea, caption: plain }, input).blockers.length, 0, "assembled caption must clear every render blocker");
+
+  const numberedIdea = { day: 2, hook: "3 reasons dog owners love Brew & Bark", body: "From espresso to play yards, here is why.", cta: "Plan your visit", points: ["House-roasted espresso", "A fenced play yard", "Treats for your pup"] };
+  const numbered = assembleCaption(numberedIdea, input);
+  assert.match(numbered, /1\. House-roasted espresso/);
+  assert.match(numbered, /2\. A fenced play yard/);
+  assert.match(numbered, /3\. Treats for your pup/);
+  assert.ok(captionFulfillsPromise({ hook: numberedIdea.hook, caption: numbered }), "model-supplied points must satisfy the numbered promise");
+
+  const missingPoints = { day: 5, hook: "3 signs your dog needs Brew & Bark", body: "Restless mornings and long afternoons.", cta: "Book a table" };
+  const padded = assembleCaption(missingPoints, input);
+  assert.ok(captionFulfillsPromise({ hook: missingPoints.hook, caption: padded }), "a numbered hook must still be fulfilled when the model omits points");
 });
 
 test("market categories do not leak operational template language", () => {

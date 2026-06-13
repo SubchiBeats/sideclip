@@ -6,7 +6,7 @@ const fsp = fs.promises;
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { version: VERSION } = require("./package.json");
-const { clean, ideaQuality, localIdeas, parseAvoid, voices, voiceOf, goalDirections } = require("./generator.js");
+const { clean, ideaQuality, localIdeas, parseAvoid, voices, voiceOf, goalDirections, assembleCaption, fewShotExamples } = require("./generator.js");
 
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, "data");
@@ -155,9 +155,9 @@ function ollamaSchema(count) {
             hook: { type: "string" },
             body: { type: "string" },
             cta: { type: "string" },
-            caption: { type: "string" }
+            points: { type: "array", items: { type: "string" } }
           },
-          required: ["format", "hook", "body", "cta", "caption"]
+          required: ["format", "hook", "body", "cta"]
         }
       }
     },
@@ -169,6 +169,7 @@ function ollamaPrompt(input, count, usedHooks = new Set(), revisions = null) {
   const voice = voices[voiceOf(input)];
   const goalDirection = goalDirections[clean(input.goal, 80)] || "";
   const avoid = parseAvoid(input.avoid);
+  const examples = revisions ? [] : fewShotExamples(input);
   const task = revisions
     ? `You previously wrote drafts that failed editorial review. Rewrite each draft so it passes, fixing every piece of feedback while keeping a similar topic:\n${revisions.map((item, index) => `${index + 1}. Draft hook: "${item.idea.hook}" | Draft body: "${item.idea.body}" | Feedback: ${item.issues.join(" ")}`).join("\n")}`
     : `Create exactly ${count} distinct short-form video post ideas for this campaign. The ideas must be usable online, not placeholder copy.`;
@@ -177,21 +178,20 @@ function ollamaPrompt(input, count, usedHooks = new Set(), revisions = null) {
 Campaign:
 - Product: ${clean(input.product, 80)}
 - Audience: ${clean(input.audience, 120)}
-- Description: ${clean(input.description, 240)}
+- Description: ${clean(input.description, 400)}
 - ${voice.direction}${goalDirection ? `\n- ${goalDirection}` : ""}
-
+${examples.length ? `\nHere are two on-brand examples for THIS business. Match their specificity and format, then write new, different ideas:\n${examples.join("\n")}\n` : ""}
 Quality rules:
 - Write for this exact business and audience; never invent capabilities, prices, or claims beyond the description.
 - The hook must be specific, engaging, and mention the product or a concrete detail from the description.
-- The supporting body must directly answer or continue the hook with a concrete detail from the description.
-- The caption must stand alone: restate the hook's payoff, add useful detail from the description, and end with the call to action. Make every caption at least 160 characters.
-- If a hook promises a number (such as "3 signs"), the caption must list that many items, numbered "1." "2." "3.".
+- The supporting body (the "body" field) must directly answer or continue the hook with a concrete detail from the description.
+- If a hook promises a number (such as "3 signs"), put exactly that many short items in the "points" array; otherwise leave "points" empty.
 - Vary the angle: customer stories, common mistakes, how-to steps, comparisons, behind the scenes, proof, questions answered, and timely moments.
 - Avoid generic phrases like "right fit", "chosen with care", "clear value", "straightforward next step", "game changer", or "details matter".
 ${avoid.length ? `- Never use these words: ${avoid.join(", ")}.\n` : ""}${usedHooks.size ? `- Do not reuse or closely echo these hooks already in the plan: ${[...usedHooks].slice(-12).join(" | ")}\n` : ""}- The cta is a short button label: a complete phrase of 8-32 characters with no hashtags.
 - Use complete sentences. Keep hook <= 100 characters and body <= 140 characters.
 
-Return only JSON with an "ideas" array of exactly ${count} items.`;
+Return only JSON with an "ideas" array of exactly ${count} items, each with format, hook, body, cta, and points.`;
 }
 
 async function ollamaBatch(input, count, usedHooks, revisions = null) {
@@ -202,7 +202,13 @@ async function ollamaBatch(input, count, usedHooks, revisions = null) {
       model: process.env.OLLAMA_MODEL,
       prompt: ollamaPrompt(input, count, usedHooks, revisions),
       stream: false,
-      format: ollamaSchema(count)
+      format: ollamaSchema(count),
+      options: {
+        temperature: Number(process.env.OLLAMA_TEMPERATURE || 0.8),
+        top_p: Number(process.env.OLLAMA_TOP_P || 0.9),
+        repeat_penalty: Number(process.env.OLLAMA_REPEAT_PENALTY || 1.2),
+        ...(process.env.OLLAMA_SEED ? { seed: Number(process.env.OLLAMA_SEED) } : {})
+      }
     }),
     signal: AbortSignal.timeout(60_000)
   });
@@ -213,44 +219,61 @@ async function ollamaBatch(input, count, usedHooks, revisions = null) {
   if (!Array.isArray(ideas)) return [];
   // Length violations are left intact so the reviewer rejects them and the
   // retry prompt asks for a rewrite - truncating here would ship fragments.
+  // The caption is assembled later, once the final day (voice index) is known.
   return ideas.slice(0, count).map(idea => ({
     format: ["Story", "Educate", "Promote"].includes(idea.format) ? idea.format : "Story",
     hook: clean(idea.hook, 400),
     body: clean(idea.body, 400),
     cta: clean(idea.cta, 200),
-    caption: clean(idea.caption, 1600)
+    points: Array.isArray(idea.points) ? idea.points.map(point => clean(point, 200)).filter(Boolean).slice(0, 6) : []
   }));
 }
 
-async function ollamaIdeas(input) {
+async function ollamaIdeas(input, diagnostics = null) {
   if (!process.env.OLLAMA_MODEL) return null;
   const batchSize = 6;
   const slots = new Array(30).fill(null);
   const used = { hooks: new Set(), bodies: new Set(), ctas: new Set() };
   const rejected = [];
-  const review = idea => {
-    if (!idea || !idea.hook || !idea.body || !idea.cta || !idea.caption) return { ok: false, issues: ["The idea is missing required fields."] };
-    const quality = ideaQuality(idea, input);
+  const note = issues => {
+    if (!diagnostics) return;
+    for (const issue of issues) diagnostics.rejects.set(issue, (diagnostics.rejects.get(issue) || 0) + 1);
+  };
+  const build = (idea, slot) => {
+    const withDay = { ...idea, day: slot + 1 };
+    return { ...withDay, caption: assembleCaption(withDay, input) };
+  };
+  const review = (idea, slot) => {
+    if (!idea || !idea.hook || !idea.body || !idea.cta) return { ok: false, issues: ["The idea is missing required fields."], built: null };
+    const built = build(idea, slot);
+    const quality = ideaQuality(built, input);
     const issues = [...quality.issues];
     if (used.hooks.has(idea.hook)) issues.push("This hook already appears in the plan; take a different angle.");
     if (used.bodies.has(idea.body)) issues.push("This supporting line already appears in the plan.");
     if (used.ctas.has(idea.cta)) issues.push("This call to action already appears in the plan.");
-    return { ok: quality.blockers.length === 0 && quality.score >= 88 && issues.length === quality.issues.length, issues };
+    // Unverifiable claims are advisory for humans (the owner knows their
+    // business) but reject AI drafts: the brief is the model's only knowledge,
+    // so a claim absent from it was invented.
+    const invented = issues.some(issue => issue.startsWith("Verify this claim"));
+    return { ok: quality.blockers.length === 0 && quality.score >= 88 && issues.length === quality.issues.length && !invented, issues, built };
   };
-  const accept = (idea, slot) => {
-    slots[slot] = idea;
-    used.hooks.add(idea.hook);
-    used.bodies.add(idea.body);
-    used.ctas.add(idea.cta);
+  const accept = (built, slot) => {
+    slots[slot] = built;
+    used.hooks.add(built.hook);
+    used.bodies.add(built.body);
+    used.ctas.add(built.cta);
   };
   for (let start = 0; start < 30; start += batchSize) {
     let batch = [];
     try { batch = await ollamaBatch(input, batchSize, used.hooks); } catch {}
     for (let offset = 0; offset < batchSize; offset++) {
       const idea = batch[offset];
-      const verdict = review(idea);
-      if (verdict.ok) accept(idea, start + offset);
-      else if (idea && idea.hook) rejected.push({ slot: start + offset, idea, issues: verdict.issues });
+      const verdict = review(idea, start + offset);
+      if (verdict.ok) accept(verdict.built, start + offset);
+      else {
+        note(verdict.issues);
+        if (idea && idea.hook) rejected.push({ slot: start + offset, idea, issues: verdict.issues });
+      }
     }
   }
   for (let start = 0; start < rejected.length; start += batchSize) {
@@ -260,7 +283,26 @@ async function ollamaIdeas(input) {
     try { revised = await ollamaBatch(input, group.length, used.hooks, group); } catch {}
     revised.forEach((idea, index) => {
       const target = group[index];
-      if (target && slots[target.slot] === null && review(idea).ok) accept(idea, target.slot);
+      if (!target || slots[target.slot] !== null) return;
+      const verdict = review(idea, target.slot);
+      if (verdict.ok) accept(verdict.built, target.slot);
+      else note(verdict.issues);
+    });
+  }
+  // Top-up: weak categories leave slots empty after the retry round. Ask for
+  // fresh ideas (not revisions) up to twice before falling back to templates.
+  for (let extra = 0; extra < 2; extra++) {
+    const empty = slots.map((slot, index) => slot === null ? index : -1).filter(index => index >= 0);
+    if (!empty.length) break;
+    let batch = [];
+    try { batch = await ollamaBatch(input, Math.min(batchSize, empty.length), used.hooks); } catch {}
+    if (!batch.length) break;
+    batch.forEach((idea, index) => {
+      const slot = empty[index];
+      if (slot === undefined) return;
+      const verdict = review(idea, slot);
+      if (verdict.ok) accept(verdict.built, slot);
+      else note(verdict.issues);
     });
   }
   const fallback = localIdeas(input);
@@ -277,7 +319,8 @@ async function ollamaIdeas(input) {
     finalUsed.bodies.add(chosen.body);
     finalUsed.ctas.add(chosen.cta);
     if (usable) aiCount++;
-    return { ...backup, ...chosen, day: index + 1, quality: ideaQuality(chosen, input).score };
+    const { points, ...clean } = { ...backup, ...chosen };
+    return { ...clean, day: index + 1, source: usable ? "ai" : "template", quality: ideaQuality(chosen, input).score };
   });
   return aiCount ? plan : null;
 }

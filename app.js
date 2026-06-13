@@ -150,7 +150,7 @@ function renderPlan(filter = "All") {
     <article class="calendar-card" data-day="${Number(item.day) || 0}">
       <span class="calendar-day">DAY ${String(item.day).padStart(2, "0")}</span>
       <span class="type-pill ${format}">${format.toUpperCase()}</span>
-      <strong>${escapeHtml(item.hook)}</strong>
+      <strong>${escapeHtml(item.hook)}${item.source === "ai" ? '<span class="source-chip" title="Written by your local AI. Give it a quick review before publishing.">AI</span>' : ""}</strong>
       <span class="score-chip ${quality.score === 100 ? "ready" : "attention"}" title="Publish readiness">${quality.score}</span>
       <button aria-label="Edit day ${Number(item.day) || 0}">→</button>
     </article>`;

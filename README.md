@@ -81,13 +81,48 @@ Prompts stay between SideClip and your configured Ollama server.
 On Windows, after installing Ollama and pulling the model once, you can also
 double-click `run-local-ai.ps1`.
 
-SideClip treats the local model like a copywriter working with an editor: ideas
-are requested in small schema-constrained batches, every idea is scored by the
-publish-readiness reviewer, and failed drafts are sent back once with the
-specific feedback ("the caption did not deliver the promised 3 signs") before
-falling back to the built-in generator for any slot that still does not pass.
-Brand voice, campaign goal, and brand-banned words are part of every prompt.
-A full 30-post run on a small CPU model typically takes one to two minutes.
+SideClip treats the local model like a copywriter working with an editor:
+
+- **Few-shot grounding.** Each prompt includes two on-brand example posts drawn
+  from the built-in generator, so the model sees the target specificity and
+  format for that exact business before writing.
+- **Hybrid captions.** The model writes the creative hook, body, call to action,
+  and (for numbered hooks) the list items; SideClip assembles the caption around
+  them so length, numbered-promise delivery, a concrete brief detail, and the
+  closing CTA pass by construction.
+- **Batched review and retry.** Ideas are requested in small schema-constrained
+  batches, scored by the publish-readiness reviewer, and failed drafts are sent
+  back once with the specific feedback quoted in the prompt before any slot
+  falls back to the built-in generator.
+- **Brand controls.** Brand voice, campaign goal, and brand-banned words are part
+  of every prompt, and invented discounts are blocked at review.
+- **Claims grounding.** Copy that asserts staff, certifications, guarantees, or
+  freebies the brief never mentioned is rejected for AI drafts (the brief is the
+  model's only knowledge, so an absent claim was invented) and flagged "verify
+  before publishing" for human edits.
+- **Top-up rounds.** If review leaves slots empty after the retry, SideClip asks
+  for up to two fresh batches before any slot falls back to templates.
+- **Labeled output.** Model-written posts carry an "AI" chip in the content plan
+  so you know exactly which days deserve a closer read before publishing.
+
+Sampling is tunable with `OLLAMA_TEMPERATURE` (default 0.8), `OLLAMA_TOP_P`
+(0.9), and `OLLAMA_REPEAT_PENALTY` (1.2). A full 30-post run on a small CPU
+model typically takes one to two minutes; a larger free model such as
+`qwen2.5:7b` or `llama3.1:8b` writes noticeably stronger copy and still runs
+fully local.
+
+To measure the local model's quality before and after a change, run the
+evaluation harness against varied briefs:
+
+```powershell
+$env:OLLAMA_MODEL="llama3.2:3b"; node tools/ai-eval.js
+```
+
+It reports, per brief, how many posts the model wrote, the average
+publish-readiness score, duplicate hooks, and any invented-offer leaks, plus a
+histogram of the top reject reasons so the next refinement targets the actual
+failure mode. Runs use a fixed sampling seed (`OLLAMA_SEED`, default 42 in the
+harness) so before/after comparisons measure the change, not sampling noise.
 
 SideClip automatically keeps an unsigned-in draft in the visitor's browser.
 Signed-in campaigns are also autosaved to the private SideClip server and the

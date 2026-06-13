@@ -83,6 +83,8 @@ test("brief captures brand voice, goal, and banned words end to end", () => {
   assert.match(app, /voice: \$\("#voice"\)\.value/);
   assert.match(app, /avoid: \$\("#avoid"\)\.value/);
   assert.match(app, /goal: \$\("#goal"\)\.value/);
+  assert.match(html, /maxlength="400"/, "the description field must allow grounding detail");
+  assert.match(app, /source-chip/, "AI-written posts must be labeled in the plan");
 });
 
 test("campaigns autosave locally and restore exact account projects", () => {
